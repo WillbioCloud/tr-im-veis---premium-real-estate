@@ -2,13 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PropertyCard from '../components/PropertyCard';
 import { Icons } from '../components/Icons';
-import { useProperties } from '../hooks/useProperties'; // Importando o hook
+import { useProperties } from '../hooks/useProperties';
+import Loading from '../components/Loading'; // Importe o Loading novo
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Substituindo o MOCK_PROPERTIES pelo hook
   const { properties, loading, error } = useProperties();
 
   const handleSearch = (e: React.FormEvent) => {
@@ -20,46 +19,52 @@ const Home: React.FC = () => {
     }
   };
 
-  // Filtrando destaques dos dados reais
   const featuredProperties = properties.filter(p => p.featured).slice(0, 3);
 
   return (
     <div className="animate-fade-in">
-      {/* Hero Section */}
-      <section className="relative h-[600px] flex items-center justify-center">
+      {/* Hero Section Premium */}
+      <section className="relative h-[85vh] flex items-center justify-center overflow-hidden">
+        {/* Imagem de Fundo com Zoom Lento */}
         <div className="absolute inset-0">
           <img 
             src="https://images.unsplash.com/photo-1600596542815-27b88e54e60f?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80" 
             alt="Luxury Home" 
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover animate-[ping_30s_linear_infinite] scale-100 hover:scale-105 transition-transform duration-[20s]" 
+            style={{ animation: 'none' }} // Removemos ping, usamos transition CSS puro se quiser zoom
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 to-slate-900/30" />
+          {/* Gradiente Duplo para Leitura Perfeita */}
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/70 via-slate-900/40 to-slate-900/80" />
         </div>
 
         <div className="relative z-10 container mx-auto px-4 text-center">
-          <h1 className="text-4xl md:text-6xl font-serif font-bold text-white mb-6 drop-shadow-lg">
-            Encontre o imóvel dos seus sonhos
+          <span className="inline-block py-1 px-3 border border-white/30 rounded-full text-white/90 text-xs font-bold tracking-[0.2em] uppercase mb-6 backdrop-blur-sm animate-slide-up">
+            Caldas Novas - GO
+          </span>
+          <h1 className="text-5xl md:text-7xl font-serif font-bold text-white mb-6 drop-shadow-2xl leading-tight animate-slide-up">
+            Realizando sonhos <br/>através de bons negócios imobiliários.
           </h1>
-          <p className="text-xl text-gray-200 mb-10 max-w-2xl mx-auto drop-shadow-md">
-            A curadoria mais exclusiva de propriedades de alto padrão.
+          <p className="text-xl text-gray-200 mb-10 max-w-2xl mx-auto font-light animate-slide-up delay-100">
+            Curadoria exclusiva de imóveis para quem sonha com a casa própria.
           </p>
 
-          <form onSubmit={handleSearch} className="max-w-4xl mx-auto bg-white p-2 rounded-full shadow-2xl flex flex-col md:flex-row items-center gap-2">
-            <div className="flex-grow w-full md:w-auto px-6 py-3 flex items-center gap-3 border-b md:border-b-0 md:border-r border-gray-100">
-              <Icons.MapPin className="text-gray-400" />
+          {/* Barra de Busca Flutuante */}
+          <form 
+            onSubmit={handleSearch} 
+            className="max-w-4xl mx-auto bg-white/10 backdrop-blur-md p-2 rounded-full border border-white/20 shadow-2xl flex flex-col md:flex-row items-center gap-2 animate-slide-up delay-200"
+          >
+            <div className="flex-grow w-full md:w-auto bg-white rounded-full px-6 py-4 flex items-center gap-3 shadow-inner">
+              <Icons.MapPin className="text-brand-500" />
               <input 
                 type="text" 
-                placeholder="Qual cidade ou bairro?" 
-                className="w-full outline-none text-gray-700 bg-transparent"
+                placeholder="Onde você quer viver? (Ex: Jardins)" 
+                className="w-full outline-none text-slate-800 placeholder-slate-400 bg-transparent font-medium"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <div className="hidden md:flex items-center px-6 py-3 gap-3 w-1/4 border-r border-gray-100 text-gray-500 cursor-pointer hover:text-gray-800">
-              <Icons.Home />
-              <span>Tipo</span>
-            </div>
-            <button type="submit" className="w-full md:w-auto bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-4 px-8 rounded-full transition-colors">
+            <button type="submit" className="w-full md:w-auto bg-brand-500 hover:bg-brand-600 text-white font-bold py-4 px-10 rounded-full transition-all shadow-lg hover:shadow-brand-500/30 flex items-center justify-center gap-2">
+              <Icons.Search size={20} />
               Buscar
             </button>
           </form>
@@ -67,24 +72,23 @@ const Home: React.FC = () => {
       </section>
 
       {/* Featured Properties */}
-      <section className="py-20 bg-white">
+      <section className="py-24 bg-brand-50">
         <div className="container mx-auto px-4">
-          <div className="flex justify-between items-end mb-12">
+          <div className="flex justify-between items-end mb-16">
             <div>
-              <span className="text-amber-600 font-bold uppercase tracking-wider text-sm">Exclusividade</span>
-              <h2 className="text-3xl md:text-4xl font-serif font-bold text-slate-900 mt-2">Destaques da Coleção</h2>
+              <span className="text-brand-600 font-bold uppercase tracking-widest text-xs mb-2 block">Coleção Exclusiva</span>
+              <h2 className="text-4xl font-serif font-bold text-slate-900">Destaques da Semana</h2>
             </div>
             <button 
               onClick={() => navigate('/imoveis')}
-              className="hidden md:flex items-center gap-2 text-slate-900 font-medium hover:text-amber-600 transition-colors"
+              className="hidden md:flex items-center gap-2 text-slate-900 font-bold border-b-2 border-brand-500 hover:text-brand-600 transition-colors pb-1"
             >
-              Ver todos <Icons.ArrowRight size={18} />
+              Ver todo o portfólio <Icons.ArrowRight size={18} />
             </button>
           </div>
 
-          {/* Loading / Error States */}
-          {loading && <div className="text-center py-10">Carregando imóveis exclusivos...</div>}
-          {error && <div className="text-center py-10 text-red-500">Erro ao carregar imóveis. Tente novamente.</div>}
+          {loading && <Loading />}
+          {error && <div className="text-center py-10 text-red-500">Erro ao carregar coleção.</div>}
           
           {!loading && !error && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -93,71 +97,57 @@ const Home: React.FC = () => {
                   <PropertyCard key={property.id} property={property} />
                 ))
               ) : (
-                <div className="col-span-3 text-center text-gray-500">
-                  Nenhum imóvel em destaque no momento.
+                <div className="col-span-3 text-center py-20 bg-white rounded-xl shadow-sm border border-dashed border-gray-300">
+                  <p className="text-gray-500">Nenhum imóvel em destaque no momento.</p>
                 </div>
               )}
             </div>
           )}
+        </div>
+      </section>
 
-          <div className="mt-8 text-center md:hidden">
-            <button onClick={() => navigate('/imoveis')} className="btn-secondary">
-              Ver todos imóveis
-            </button>
+      {/* Categorias / Lifestyle */}
+      <section className="py-24 bg-white">
+        <div className="container mx-auto px-4 text-center mb-16">
+           <h2 className="text-4xl font-serif font-bold text-slate-900 mb-4">Viva o seu melhor estilo</h2>
+           <p className="text-gray-500">Selecione o que mais combina com seu momento de vida.</p>
+        </div>
+        
+        <div className="container mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-4 h-[500px]">
+          {/* Card Grande Esquerda */}
+          <div 
+             onClick={() => navigate('/imoveis?type=Casa')}
+             className="md:col-span-2 md:row-span-2 relative rounded-2xl overflow-hidden cursor-pointer group"
+          >
+            <img src="https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=800&q=80" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Casas" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent p-8 flex flex-col justify-end">
+              <h3 className="text-white font-serif text-3xl font-bold mb-2">Casas de Luxo</h3>
+              <p className="text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-4 group-hover:translate-y-0 duration-500">Privacidade e conforto absoluto.</p>
+            </div>
+          </div>
+
+          {/* Cards Direita */}
+          <div onClick={() => navigate('/imoveis?type=Apartamento')} className="relative rounded-2xl overflow-hidden cursor-pointer group">
+            <img src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Apartamentos" />
+            <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+               <h3 className="text-white font-serif text-xl font-bold">Apartamentos</h3>
+            </div>
+          </div>
+          <div onClick={() => navigate('/imoveis?type=Cobertura')} className="relative rounded-2xl overflow-hidden cursor-pointer group">
+            <img src="https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Coberturas" />
+            <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+               <h3 className="text-white font-serif text-xl font-bold">Coberturas</h3>
+            </div>
+          </div>
+          <div onClick={() => navigate('/imoveis?city=Jardins')} className="md:col-span-2 relative rounded-2xl overflow-hidden cursor-pointer group">
+            <img src="https://images.unsplash.com/photo-1449844908441-8829872d2607?auto=format&fit=crop&w=800&q=80" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Bairros" />
+            <div className="absolute inset-0 bg-black/50 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+               <h3 className="text-white font-serif text-2xl font-bold">Bairros Nobres</h3>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Neighborhoods / SEO Section */}
-      <section className="py-20 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-serif font-bold text-slate-900 mb-10 text-center">Explore por Região</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-            {['Jardins', 'Alphaville', 'Vila Nova Conceição', 'Lago Sul'].map((hood, i) => (
-              <div 
-                key={hood} 
-                onClick={() => navigate(`/imoveis?city=${hood}`)}
-                className="relative h-64 rounded-xl overflow-hidden cursor-pointer group"
-              >
-                <img 
-                  src={`https://picsum.photos/400/600?random=${i+10}`} 
-                  alt={hood} 
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                />
-                <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors" />
-                <div className="absolute bottom-4 left-4 text-white">
-                  <h3 className="text-xl font-bold">{hood}</h3>
-                  <span className="text-xs opacity-90 group-hover:underline">Ver propriedades</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="py-20 bg-slate-900 text-white">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-serif font-bold mb-12">O que dizem nossos clientes</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-slate-800 p-8 rounded-2xl relative">
-                <div className="text-amber-500 text-4xl font-serif absolute top-4 left-6">"</div>
-                <p className="text-gray-300 italic mb-6 pt-4">
-                  Excelente atendimento. A equipe da TR Imóveis entendeu exatamente o que eu buscava.
-                </p>
-                <div className="flex items-center justify-center gap-4">
-                  <div className="w-10 h-10 bg-gray-600 rounded-full" />
-                  <div className="text-left">
-                    <p className="font-bold">Cliente Satisfeito</p>
-                    <p className="text-xs text-gray-400">Comprador Verificado</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
     </div>
   );
 };
