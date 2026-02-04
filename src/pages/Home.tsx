@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PropertyCard from '../components/PropertyCard';
-import { MOCK_PROPERTIES } from '../constants';
 import { Icons } from '../components/Icons';
+import { useProperties } from '../hooks/useProperties'; // Importando o hook
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Substituindo o MOCK_PROPERTIES pelo hook
+  const { properties, loading, error } = useProperties();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,7 +20,8 @@ const Home: React.FC = () => {
     }
   };
 
-  const featuredProperties = MOCK_PROPERTIES.filter(p => p.featured).slice(0, 3);
+  // Filtrando destaques dos dados reais
+  const featuredProperties = properties.filter(p => p.featured).slice(0, 3);
 
   return (
     <div className="animate-fade-in">
@@ -37,7 +41,7 @@ const Home: React.FC = () => {
             Encontre o imóvel dos seus sonhos
           </h1>
           <p className="text-xl text-gray-200 mb-10 max-w-2xl mx-auto drop-shadow-md">
-            A curadoria mais exclusiva de propriedades de alto padrão em São Paulo e região.
+            A curadoria mais exclusiva de propriedades de alto padrão.
           </p>
 
           <form onSubmit={handleSearch} className="max-w-4xl mx-auto bg-white p-2 rounded-full shadow-2xl flex flex-col md:flex-row items-center gap-2">
@@ -54,10 +58,6 @@ const Home: React.FC = () => {
             <div className="hidden md:flex items-center px-6 py-3 gap-3 w-1/4 border-r border-gray-100 text-gray-500 cursor-pointer hover:text-gray-800">
               <Icons.Home />
               <span>Tipo</span>
-            </div>
-            <div className="hidden md:flex items-center px-6 py-3 gap-3 w-1/4 text-gray-500 cursor-pointer hover:text-gray-800">
-              <Icons.Search />
-              <span>Preço</span>
             </div>
             <button type="submit" className="w-full md:w-auto bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-4 px-8 rounded-full transition-colors">
               Buscar
@@ -82,11 +82,23 @@ const Home: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {featuredProperties.map(property => (
-              <PropertyCard key={property.id} property={property} />
-            ))}
-          </div>
+          {/* Loading / Error States */}
+          {loading && <div className="text-center py-10">Carregando imóveis exclusivos...</div>}
+          {error && <div className="text-center py-10 text-red-500">Erro ao carregar imóveis. Tente novamente.</div>}
+          
+          {!loading && !error && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {featuredProperties.length > 0 ? (
+                featuredProperties.map(property => (
+                  <PropertyCard key={property.id} property={property} />
+                ))
+              ) : (
+                <div className="col-span-3 text-center text-gray-500">
+                  Nenhum imóvel em destaque no momento.
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="mt-8 text-center md:hidden">
             <button onClick={() => navigate('/imoveis')} className="btn-secondary">
@@ -132,13 +144,13 @@ const Home: React.FC = () => {
               <div key={i} className="bg-slate-800 p-8 rounded-2xl relative">
                 <div className="text-amber-500 text-4xl font-serif absolute top-4 left-6">"</div>
                 <p className="text-gray-300 italic mb-6 pt-4">
-                  Excelente atendimento. A equipe da TR Imóveis entendeu exatamente o que eu buscava e encontrou a casa perfeita em tempo recorde.
+                  Excelente atendimento. A equipe da TR Imóveis entendeu exatamente o que eu buscava.
                 </p>
                 <div className="flex items-center justify-center gap-4">
                   <div className="w-10 h-10 bg-gray-600 rounded-full" />
                   <div className="text-left">
                     <p className="font-bold">Cliente Satisfeito</p>
-                    <p className="text-xs text-gray-400">Comprador em Alphaville</p>
+                    <p className="text-xs text-gray-400">Comprador Verificado</p>
                   </div>
                 </div>
               </div>
