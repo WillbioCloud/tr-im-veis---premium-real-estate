@@ -1,0 +1,122 @@
+import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { Icons } from './Icons';
+import { COMPANY_NAME } from '../constants';
+
+const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const location = useLocation();
+
+  // Simple check to hide public layout elements if needed, 
+  // though Admin usually has its own layout wrapper.
+  const isAdmin = location.pathname.startsWith('/admin');
+
+  if (isAdmin) return <>{children}</>;
+
+  return (
+    <div className="min-h-screen flex flex-col font-sans text-gray-800 bg-gray-50">
+      {/* Top Bar */}
+      <div className="bg-slate-900 text-white py-2 text-xs md:text-sm">
+        <div className="container mx-auto px-4 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1"><Icons.Mail size={14} /> contato@trimoveis.com</span>
+            <span className="flex items-center gap-1"><Icons.Phone size={14} /> (11) 3333-4444</span>
+          </div>
+          <div className="hidden md:flex gap-4">
+            <Link to="/admin/login" className="hover:text-amber-400 transition-colors">Área do Corretor</Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <Link to="/" className="text-2xl font-serif font-bold tracking-tight text-slate-900">
+            {COMPANY_NAME}
+          </Link>
+
+          {/* Desktop Nav */}
+          <nav className="hidden md:flex items-center gap-8 font-medium text-sm">
+            <Link to="/" className="hover:text-amber-600 transition-colors">Home</Link>
+            <Link to="/imoveis" className="hover:text-amber-600 transition-colors">Imóveis</Link>
+            <Link to="/servicos" className="hover:text-amber-600 transition-colors">Serviços</Link>
+            <Link to="/sobre" className="hover:text-amber-600 transition-colors">Sobre Nós</Link>
+            <Link to="/contato" className="px-5 py-2.5 bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-all shadow-md hover:shadow-lg">
+              Fale Conosco
+            </Link>
+          </nav>
+
+          {/* Mobile Menu Toggle */}
+          <button 
+            className="md:hidden text-slate-900"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            {isMobileMenuOpen ? <Icons.X /> : <Icons.Menu />}
+          </button>
+        </div>
+
+        {/* Mobile Nav */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden bg-white border-t p-4 flex flex-col gap-4 shadow-xl absolute w-full">
+            <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="py-2 border-b">Home</Link>
+            <Link to="/imoveis" onClick={() => setIsMobileMenuOpen(false)} className="py-2 border-b">Imóveis</Link>
+            <Link to="/servicos" onClick={() => setIsMobileMenuOpen(false)} className="py-2 border-b">Serviços</Link>
+            <Link to="/admin/login" onClick={() => setIsMobileMenuOpen(false)} className="py-2 text-slate-500">Área Restrita</Link>
+            <Link to="/contato" onClick={() => setIsMobileMenuOpen(false)} className="py-3 text-center bg-amber-500 text-white rounded-lg font-bold">
+              Fale Conosco
+            </Link>
+          </div>
+        )}
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-grow">
+        {children}
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-slate-900 text-gray-300 py-12">
+        <div className="container mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div>
+            <h3 className="text-2xl font-serif font-bold text-white mb-4">{COMPANY_NAME}</h3>
+            <p className="text-sm leading-relaxed">
+              Especialistas em imóveis de alto padrão. Encontramos o lar perfeito para sua história.
+            </p>
+          </div>
+          <div>
+            <h4 className="text-white font-bold mb-4">Links Rápidos</h4>
+            <ul className="space-y-2 text-sm">
+              <li><Link to="/imoveis" className="hover:text-amber-400">Comprar Imóvel</Link></li>
+              <li><Link to="/bairros/jardins" className="hover:text-amber-400">Imóveis nos Jardins</Link></li>
+              <li><Link to="/bairros/alphaville" className="hover:text-amber-400">Casas em Alphaville</Link></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="text-white font-bold mb-4">Contato</h4>
+            <ul className="space-y-2 text-sm">
+              <li className="flex items-center gap-2"><Icons.MapPin size={16}/> Av. Paulista, 1000 - SP</li>
+              <li className="flex items-center gap-2"><Icons.Phone size={16}/> (11) 3333-4444</li>
+              <li className="flex items-center gap-2"><Icons.Mail size={16}/> contato@trimoveis.com</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="text-white font-bold mb-4">Newsletter</h4>
+            <div className="flex gap-2">
+              <input 
+                type="email" 
+                placeholder="Seu e-mail" 
+                className="bg-slate-800 border border-slate-700 text-white px-3 py-2 rounded-l-md w-full focus:outline-none focus:border-amber-500"
+              />
+              <button className="bg-amber-500 text-slate-900 px-4 py-2 rounded-r-md font-bold hover:bg-amber-400">OK</button>
+            </div>
+          </div>
+        </div>
+        <div className="container mx-auto px-4 mt-12 pt-8 border-t border-slate-800 text-center text-xs text-gray-500">
+          © {new Date().getFullYear()} {COMPANY_NAME}. Todos os direitos reservados.
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+export default Layout;
