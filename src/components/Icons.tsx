@@ -1,30 +1,58 @@
 import { 
-  Home, 
   MapPin, 
+  Phone, 
+  Mail, 
+  Menu, 
+  X, 
+  ArrowRight, 
+  Search, 
+  Home, 
   Bed, 
   Bath, 
   Car, 
-  Search, 
-  Menu, 
-  X, 
-  Phone, 
-  Mail, 
-  ArrowRight,
-  LayoutDashboard,
+  CheckCircle, 
+  Star, 
+  RefreshCw, 
+  Edit, 
+  Trash, 
+  Plus,
   Users,
   Building,
-  Settings,
-  Filter,
-  CheckCircle,
-  MoreVertical,
-  Trash2,
-  Edit,
-  Share2,
-  Calendar
+  Calendar,
+  LogOut,
+  LayoutDashboard, // Importante para o Admin
+  Settings,        // Importante
+  PieChart,        // Importante
+  BarChart3,       // Opcional
+  Filter           // Útil para listas
 } from 'lucide-react';
 
 export const Icons = {
-  Home, MapPin, Bed, Bath, Car, Search, Menu, X, Phone, Mail, ArrowRight,
-  LayoutDashboard, Users, Building, Settings, Filter, CheckCircle,
-  MoreVertical, Trash2, Edit, Share2, Calendar
+  MapPin,
+  Phone, 
+  Mail, 
+  Menu, 
+  X, 
+  ArrowRight, 
+  Search, 
+  Home, 
+  Bed, 
+  Bath, 
+  Car, 
+  CheckCircle, 
+  Star, 
+  RefreshCw, 
+  Edit, 
+  Trash, 
+  Plus,
+  Users,
+  Building,
+  Calendar,
+  LogOut,
+  // Mapeando nomes comuns para evitar erros
+  Dashboard: LayoutDashboard, 
+  Settings,
+  PieChart,
+  BarChart: BarChart3,
+  Filter
 };
