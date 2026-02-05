@@ -3,6 +3,8 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AnimatePresence } from 'framer-motion'; // <--- Importante
+import AdminTasks from './pages/AdminTasks';
+import AdminConfig from './pages/AdminConfig';
 
 import Layout from './components/Layout';
 import AdminLayout from './components/AdminLayout';
@@ -67,13 +69,16 @@ const App: React.FC = () => {
           <Route element={<ProtectedRoute />}>
             <Route path="/admin" element={<AdminLayout><AdminDashboard /></AdminLayout>} />
             <Route path="/admin/dashboard" element={<AdminLayout><AdminDashboard /></AdminLayout>} />
+
+            {/* Nova Rota de Agenda */}
+            <Route path="/admin/tarefas" element={<AdminLayout><AdminTasks /></AdminLayout>} />
             
             <Route path="/admin/imoveis" element={<AdminLayout><AdminProperties /></AdminLayout>} />
             <Route path="/admin/imoveis/novo" element={<AdminLayout><AdminPropertyForm /></AdminLayout>} />
             <Route path="/admin/imoveis/editar/:id" element={<AdminLayout><AdminPropertyForm /></AdminLayout>} />
             
             <Route path="/admin/leads" element={<AdminLayout><AdminLeads /></AdminLayout>} />
-            <Route path="/admin/config" element={<AdminLayout><div className="p-4">Configurações</div></AdminLayout>} />
+            <Route path="/admin/config" element={<AdminLayout><AdminConfig /></AdminLayout>} />
           </Route>
 
           {/* Fallback */}

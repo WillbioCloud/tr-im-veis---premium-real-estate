@@ -27,7 +27,19 @@ const PropertyDetail: React.FC = () => {
         .single();
 
       if (data) {
-        setProperty(data as Property);
+        const prop = data as Property;
+        setProperty(prop);
+
+        // === TRACKING: Salva que o usuário viu este imóvel ===
+        try {
+          const visited = JSON.parse(localStorage.getItem('visited_properties') || '[]');
+          if (prop?.id && !visited.includes(prop.id)) {
+            visited.push(prop.id);
+            localStorage.setItem('visited_properties', JSON.stringify(visited));
+          }
+        } catch {
+          // Se o localStorage estiver bloqueado/indisponível, só ignora.
+        }
       } else {
         console.error('Erro ao buscar imóvel:', error);
       }
@@ -44,27 +56,57 @@ const PropertyDetail: React.FC = () => {
 
     setFormStatus('sending');
 
-    // 1. Salvar no Supabase (Isso vai para o seu Kanban)
-    const { error } = await supabase.from('leads').insert([{
-      name: leadName,
-      phone: leadPhone,
-      status: LeadStatus.NEW,
-      property_id: property.id, // Vincula o interesse a este imóvel
-      source: 'Página do Imóvel',
-      message: `Interesse no imóvel: ${property.title}`
-    }]);
+    // 1) Cria o Lead
+    const { data: newLead, error } = await supabase
+      .from('leads')
+      .insert([
+        {
+          name: leadName,
+          phone: leadPhone,
+          status: LeadStatus.NEW,
+          property_id: property.id, // Imóvel de Origem (Principal)
+          source: 'Site - Página do Imóvel',
+          score: 50, // Score inicial
+          value: property.price, // Valor do negócio potencial
+          message: `Interesse no imóvel: ${property.title}`,
+        },
+      ])
+      .select()
+      .single();
 
-    if (error) {
+    if (error || !newLead) {
       console.error('Erro ao salvar lead:', error);
       setFormStatus('error');
-    } else {
-      setFormStatus('success');
-      setLeadName('');
-      setLeadPhone('');
-      
-      // Opcional: Redirecionar para WhatsApp automaticamente após cadastro
-      // window.open(whatsappLink, '_blank');
+      return;
     }
+
+    // 2) Salva o Histórico de Navegação (Interesses)
+    try {
+      const visited = JSON.parse(localStorage.getItem('visited_properties') || '[]');
+
+      const interests = (Array.isArray(visited) ? visited : [])
+        .filter(Boolean)
+        .map((propId: string) => ({
+          lead_id: newLead.id,
+          property_id: propId,
+        }));
+
+      // Se a lista estiver vazia, adiciona pelo menos o atual
+      if (interests.length === 0) {
+        interests.push({ lead_id: newLead.id, property_id: property.id });
+      }
+
+      await supabase.from('lead_interests').insert(interests);
+
+      // Limpa o histórico local após envio (opcional, bom para privacidade)
+      localStorage.removeItem('visited_properties');
+    } catch {
+      // ignora falhas de storage
+    }
+
+    setFormStatus('success');
+    setLeadName('');
+    setLeadPhone('');
   };
 
   if (loading) return <div className="p-20 text-center animate-pulse">Carregando detalhes...</div>;

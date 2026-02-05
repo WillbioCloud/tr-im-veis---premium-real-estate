@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Icons } from './Icons';
 import { COMPANY_NAME } from '../constants';
 
+
 const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { signOut } = useAuth();
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const menuItems = [
     { label: 'Dashboard', path: '/admin/dashboard', icon: Icons.Dashboard },
+    { label: 'Agenda', path: '/admin/tarefas', icon: Icons.Calendar }, // <--- NOVO ITEM
     { label: 'Imóveis', path: '/admin/imoveis', icon: Icons.Building },
     { label: 'Leads (CRM)', path: '/admin/leads', icon: Icons.Users },
     { label: 'Configurações', path: '/admin/config', icon: Icons.Settings },

@@ -24,7 +24,7 @@ export interface Property {
   type: PropertyType;
   bedrooms: number;
   bathrooms: number;
-  area: number; // m²
+  area: number;
   garage: number;
   location: {
     city: string;
@@ -36,6 +36,27 @@ export interface Property {
   featured?: boolean;
 }
 
+// === NOVOS TIPOS PARA O CRM ===
+
+export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  due_date: string;
+  completed: boolean;
+  type: 'call' | 'meeting' | 'email' | 'visit' | 'whatsapp' | 'other';
+  lead_id: string;
+}
+
+export interface TimelineEvent {
+  id: string;
+  created_at: string;
+  type: 'status_change' | 'note' | 'call_log' | 'whatsapp' | 'system'; // <--- Tem que ter 'whatsapp' aqui
+  description: string;
+  metadata?: any;
+  lead_id: string;
+}
+
 export interface Lead {
   id: string;
   name: string;
@@ -43,9 +64,17 @@ export interface Lead {
   phone: string;
   message?: string;
   status: LeadStatus;
-  propertyId?: string; // Interest in specific property
+  propertyId?: string;
   createdAt: string;
   source: string;
+  
+  // Campos CRM Premium
+  value?: number;          // Valor potencial
+  probability?: number;    // 0 a 100%
+  loss_reason?: string;    // Se status for LOST
+  last_interaction?: string; // Para SLA
+  expected_close_date?: string;
+  score: number; // <--- NOVO CAMPO
 }
 
 export interface FilterState {
