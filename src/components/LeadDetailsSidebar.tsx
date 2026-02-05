@@ -7,6 +7,7 @@ interface LeadDetailsSidebarProps {
   lead: Lead;
   onClose: () => void;
   onUpdate: () => void;
+  initialTab?: 'info' | 'activity' | 'timeline' | 'matches';
 }
 
 interface Template {
@@ -35,9 +36,20 @@ const statusBadge = (status: LeadStatus) => {
   }
 };
 
-const LeadDetailsSidebar: React.FC<LeadDetailsSidebarProps> = ({ lead, onClose, onUpdate }) => {
+const LeadDetailsSidebar: React.FC<LeadDetailsSidebarProps> = ({
+  lead,
+  onClose,
+  onUpdate,
+  initialTab = 'info'
+}) => {
+
   // Tabs
-  const [activeTab, setActiveTab] = useState<TabKey>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'activity' | 'timeline' | 'matches'>(initialTab);
+    
+    useEffect(() => {
+        if (initialTab) setActiveTab(initialTab);
+    }, [initialTab]);
+
 
   // Dados CRM
   const [tasks, setTasks] = useState<Task[]>([]);

@@ -11,6 +11,7 @@ export enum LeadStatus {
   QUALIFYING = 'Qualificando',
   VISIT = 'Visita Agendada',
   PROPOSAL = 'Proposta',
+  CONTACTED = 'Em Contato',
   CLOSED = 'Fechado',
   LOST = 'Perdido'
 }
