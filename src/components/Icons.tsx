@@ -4,8 +4,7 @@ import {
   LogOut, LayoutDashboard, Settings, PieChart, BarChart3, Filter, Moon, Sun,
   DollarSign, TrendingUp, Activity, Clock, Loader2, MessageCircle, CheckSquare, 
   Image, User, AlertTriangle, Flame, Upload, 
-  FileSpreadsheet, AlertCircle, Pause, Play,
-   // Adicionei Loader2
+  FileSpreadsheet, AlertCircle, Pause, Play, Info, Shield, Lock, Check, ChevronRight, MoreVertical
 } from 'lucide-react';
 
 export const Icons = {
@@ -14,5 +13,5 @@ export const Icons = {
   LogOut, DollarSign, TrendingUp, Activity, Clock, Loader2,
   Dashboard: LayoutDashboard, Settings, PieChart, BarChart: BarChart3, Filter, MessageCircle, Moon, Sun, 
   CheckSquare, Image, User, AlertTriangle, Flame, Upload,
-  FileSpreadsheet, AlertCircle, Pause, Play
+  FileSpreadsheet, AlertCircle, Pause, Play, Info, Shield, Lock, Check, ChevronRight, MoreVertical
 };
