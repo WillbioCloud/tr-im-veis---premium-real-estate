@@ -81,36 +81,3 @@ export const MOCK_PROPERTIES: Property[] = [
     featured: true
   }
 ];
-
-export const MOCK_LEADS: Lead[] = [
-  {
-    id: '101',
-    name: 'Roberto Silva',
-    email: 'roberto@email.com',
-    phone: '11987654321',
-    status: LeadStatus.NEW,
-    propertyId: '1',
-    createdAt: '2023-10-25T10:00:00',
-    source: 'Site - Detalhe Imóvel'
-  },
-  {
-    id: '102',
-    name: 'Ana Souza',
-    email: 'ana@email.com',
-    phone: '11912345678',
-    status: LeadStatus.VISIT,
-    propertyId: '2',
-    createdAt: '2023-10-24T14:30:00',
-    source: 'WhatsApp'
-  },
-  {
-    id: '103',
-    name: 'Carlos Mendes',
-    email: 'carlos@invest.com',
-    phone: '21999887766',
-    status: LeadStatus.PROPOSAL,
-    propertyId: '3',
-    createdAt: '2023-10-20T09:15:00',
-    source: 'Indicação'
-  }
-];
