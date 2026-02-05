@@ -35,6 +35,15 @@ export interface Property {
   features: string[];
   images: string[];
   featured?: boolean;
+  
+  // === NOVOS CAMPOS RICOS ===
+  iptu?: number;
+  condominium?: number;
+  suites?: number;
+  video_url?: string;
+  owner_name?: string; // Visível apenas no admin
+  owner_phone?: string; // Visível apenas no admin
+  created_at?: string;
 }
 
 // === NOVOS TIPOS PARA O CRM ===
@@ -68,6 +77,7 @@ export interface Lead {
   propertyId?: string;
   createdAt: string;
   source: string;
+  assigned_to?: string; // <--- NOVO: ID do corretor dono
   
   // Campos CRM Premium
   value?: number;          // Valor potencial
