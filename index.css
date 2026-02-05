@@ -2,10 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Estilização da barra de rolagem (Kanban) */
+/* =========================================================
+   BASE (Tema CRM)
+   - Fundo frio clean (igual ao concept)
+   - Texto e rendering mais “SaaS”
+   ========================================================= */
+
+html, body {
+  height: 100%;
+}
+
+body {
+  @apply bg-crm-bg text-crm-text transition-colors duration-300 font-sans antialiased;
+}
+
+.dark body {
+  @apply bg-dark-bg text-dark-text;
+}
+
+/* Melhor renderização (fica mais “premium”) */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* =========================================================
+   INPUTS
+   - Cursor e foco alinhados com o verde do concept
+   ========================================================= */
+
+input, textarea, select {
+  caret-color: #50C070; /* crm.primary */
+}
+
+/* =========================================================
+   SCROLLBAR (clean e discreta)
+   ========================================================= */
+
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -13,15 +49,102 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1; /* Slate 300 */
-  border-radius: 20px;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.25); /* slate-500/25 */
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: #94a3b8; /* Slate 400 */
+  background: rgba(100, 116, 139, 0.38);
 }
 
-/* Scrollbar no Dark Mode */
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #475569; /* Slate 600 */
+  background: rgba(148, 163, 184, 0.25); /* dark muted */
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.40);
+}
+
+/* =========================================================
+   COMPONENT CLASSES (tokens prontos p/ usar no CRM)
+   ========================================================= */
+
+/* Card padrão (Opportunity Details / panels) */
+.crm-card {
+  @apply bg-crm-surface border border-crm-border rounded-xl shadow-soft2;
+}
+
+/* Card “elevado” (sidebar/painéis importantes) */
+.crm-card-elevated {
+  @apply bg-crm-surface border border-crm-border rounded-xl shadow-soft;
+}
+
+/* Pills roxas (secondary) */
+.crm-pill {
+  background: rgba(112, 48, 224, 0.10);
+  color: #7030E0;
+  border: 1px solid rgba(112, 48, 224, 0.20);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* Badge verde (primary) */
+.crm-badge-green {
+  background: rgba(80, 192, 112, 0.12);
+  color: #1f7a3c;
+  border: 1px solid rgba(80, 192, 112, 0.25);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-weight: 800;
+  font-size: 12px;
+}
+
+/* Tabs do conceito (underline verde) */
+.crm-tab {
+  @apply text-crm-muted border-b-2 border-transparent px-1 pb-3 text-sm font-bold transition-colors;
+}
+
+.crm-tab-active {
+  @apply text-crm-text border-b-2;
+  border-color: #50C070; /* crm.primary */
+}
+
+/* Seções com título/label (typography do concept) */
+.crm-section-label {
+  @apply text-xs font-extrabold uppercase tracking-widest text-crm-muted;
+}
+
+/* Divisor sutil */
+.crm-divider {
+  @apply border-t border-crm-border;
+}
+
+/* Botão primary (verde) */
+.crm-btn-primary {
+  background: #50C070;
+  color: #0B1220;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-weight: 800;
+  transition: filter 200ms ease;
+}
+.crm-btn-primary:hover { filter: brightness(0.96); }
+
+/* Botão ghost */
+.crm-btn-ghost {
+  @apply rounded-xl px-4 py-3 font-bold text-crm-muted hover:bg-black/5 hover:text-crm-text transition-colors;
+}
+.dark .crm-btn-ghost {
+  @apply hover:bg-white/10;
+}
+
+/* =========================================================
+   OPTIONAL: reduzir “cara de template” em botões/inputs
+   ========================================================= */
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
