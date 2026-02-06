@@ -27,24 +27,40 @@ export interface Property {
   bathrooms: number;
   area: number;
   garage: number;
+  
+  // Estrutura Visual (Frontend)
   location: {
-    address: string;
     city: string;
     neighborhood: string;
     state: string;
+    address?: string;
   };
+
+  // Estrutura Plana (Banco de Dados) - Opcionais para mapeamento
+  city?: string;
+  neighborhood?: string;
+  state?: string;
+
   features: string[];
   images: string[];
   featured?: boolean;
   
-  // === NOVOS CAMPOS RICOS ===
+  // Financeiro e Admin
   iptu?: number;
   condominium?: number;
   suites?: number;
   video_url?: string;
-  owner_name?: string; // Visível apenas no admin
-  owner_phone?: string; // Visível apenas no admin
+  owner_name?: string;
+  owner_phone?: string;
   created_at?: string;
+
+  // NOVO: Vinculo com Corretor
+  agent_id?: string;
+  agent?: {
+    name: string;
+    phone: string;
+    email: string;
+  };
 }
 
 // === NOVOS TIPOS PARA O CRM ===

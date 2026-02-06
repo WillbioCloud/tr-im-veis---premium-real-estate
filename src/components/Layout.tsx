@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Icons } from './Icons';
 import { COMPANY_NAME } from '../constants';
@@ -6,6 +6,12 @@ import { COMPANY_NAME } from '../constants';
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
+
+  // === CORREÇÃO DO TEMA ===
+  // Força o site público a ser sempre Claro, ignorando a escolha do Admin
+  useEffect(() => {
+    document.documentElement.classList.remove('dark');
+  }, []);
 
   // Simple check to hide public layout elements if needed, 
   // though Admin usually has its own layout wrapper.

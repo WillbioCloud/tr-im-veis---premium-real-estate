@@ -10,28 +10,33 @@ export function useProperties() {
   useEffect(() => {
     async function fetchProperties() {
       try {
-        setLoading(true);
+        // Agora fazemos um JOIN para trazer os dados do corretor (profiles)
         const { data, error } = await supabase
           .from('properties')
-          .select('*');
+          .select('*, agent:profiles(name, phone, email)') // <--- O PULO DO GATO
+          .order('created_at', { ascending: false });
 
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
         if (data) {
-          // Mapeamento necessário se o banco retornar campos ligeiramente diferentes
-          // Mas como criamos a tabela baseada no tipo, deve bater direto.
-          // Ajuste para garantir que 'location' seja montado corretamente se vier plano do banco
-          const formattedData: Property[] = data.map((item: any) => ({
-            ...item,
+          // Mapeia os dados planos do banco para o objeto Property do frontend
+          const mappedProperties: Property[] = data.map((p: any) => ({
+            ...p,
+            // Corrige a localização que estava sumindo
             location: {
-              city: item.city,
-              neighborhood: item.neighborhood,
-              state: item.state
-            }
+              city: p.city,
+              neighborhood: p.neighborhood,
+              state: p.state,
+              address: p.address
+            },
+            // Garante que features e images sejam arrays
+            features: p.features || [],
+            images: p.images || [],
+            // Dados do agente (se existir)
+            agent: p.agent
           }));
-          setProperties(formattedData);
+          
+          setProperties(mappedProperties);
         }
       } catch (err: any) {
         setError(err.message);
