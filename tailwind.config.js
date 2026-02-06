@@ -40,7 +40,7 @@ export default {
 
         // ✅ NOVO: tokens CRM (para ficar igual ao concept)
         crm: {
-          bg: '#F5F7FB',        // fundo geral (branco frio)
+          bg: '#FFF5DE',        // fundo geral (um bege claro)
           surface: '#FFFFFF',   // cards/branco puro
           border: '#E7ECF3',    // borda sutil
           text: '#0B1220',      // texto forte
