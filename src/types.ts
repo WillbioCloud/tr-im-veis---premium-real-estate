@@ -28,6 +28,7 @@ export interface Property {
   area: number;
   garage: number;
   location: {
+    address: string;
     city: string;
     neighborhood: string;
     state: string;
@@ -94,4 +95,17 @@ export interface FilterState {
   maxPrice: number | '';
   bedrooms: number | '';
   type: string;
+}
+
+export interface Profile {
+  id: string;
+  name: string;
+  email: string;
+  active: boolean;
+}
+
+export interface Template {
+  id: string;
+  title: string;
+  content: string;
 }

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Icons } from '../components/Icons';
-import { Profile } from '../types';
 
+interface Profile { id: string; name: string; email: string; active: boolean; }
 interface Template { id: string; title: string; content: string; }
 
 const AdminConfig: React.FC = () => {

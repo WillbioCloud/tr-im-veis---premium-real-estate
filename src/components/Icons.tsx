@@ -42,7 +42,12 @@ import {
   MoreVertical,
   Play,
   Pause,
-  Info
+  Info,
+  Lock,
+  Shield,
+  AlertCircle,
+  ChevronRight,
+  Check,
 } from 'lucide-react';
 
 export const Icons = {
@@ -91,5 +96,10 @@ export const Icons = {
   MoreVertical,
   Play,
   Pause,
-  Info
+  Info,
+  Lock,
+  Shield,
+  AlertCircle,
+  ChevronRight,
+  Check,
 };
