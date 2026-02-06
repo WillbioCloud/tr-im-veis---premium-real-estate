@@ -1,13 +1,21 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
-  base: '/', // Garante que os caminhos funcionem na raiz
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'), // Cria o atalho @ para a pasta src
-    },
-  },
+  base: '/',
+  build: {
+    outDir: 'dist',
+    chunkSizeWarningLimit: 1600, // Aumenta o limite para 1.6MB (silencia o aviso)
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Separa bibliotecas pesadas em arquivos diferentes
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        }
+      }
+    }
+  }
 });
