@@ -48,6 +48,8 @@ import {
   AlertCircle,
   ChevronRight,
   Check,
+  Upload,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 export const Icons = {
@@ -102,4 +104,6 @@ export const Icons = {
   AlertCircle,
   ChevronRight,
   Check,
+  Upload,
+  FileSpreadsheet,
 };

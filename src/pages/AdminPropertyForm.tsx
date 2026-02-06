@@ -43,12 +43,12 @@ const AdminPropertyForm: React.FC = () => {
 
   const handleLocationChange = (field: string, value: string) => {
     setProperty((prev) => ({
-      ...prev,
-      location: {
-        ...(prev.location || {}),
-        [field]: value
-      }
-    }));
+        ...prev,
+        location: {
+          ...(prev.location || {}),
+          [field]: value
+        }
+      }));
   };
 
   const handleAddImage = () => {
