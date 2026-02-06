@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom'; // <--- Importante
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Lead, LeadStatus } from '../types';
 import { Icons } from '../components/Icons';
 import LeadDetailsSidebar from '../components/LeadDetailsSidebar';
+import { useAuth } from '../contexts/AuthContext';
+import { TOOLTIPS } from '../constants/tooltips';
 import {
   DndContext,
   useDraggable,
@@ -15,44 +17,48 @@ import {
   useSensors
 } from '@dnd-kit/core';
 
-// === COMPONENTES INTERNOS (DND) ===
-const DroppableColumn = ({
-  id,
-  children,
-  className
-}: {
-  id: string;
-  children: React.ReactNode;
-  className?: string;
-}) => {
+// === COMPONENTES DE APOIO ===
+
+// 1. Tooltip (Balão de Ajuda)
+const InfoTooltip = ({ text }: { text: string }) => (
+  <div className="group relative inline-flex items-center ml-2 z-20">
+    <Icons.Info size={14} className="text-slate-400 cursor-help hover:text-brand-500 transition-colors" />
+    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden w-64 p-3 bg-slate-800 text-white text-xs rounded-lg shadow-xl group-hover:block z-50 text-center leading-relaxed font-normal">
+      {text}
+      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 h-2 w-2 -rotate-45 bg-slate-800"></div>
+    </div>
+  </div>
+);
+
+// 2. Coluna do Kanban (Droppable)
+const DroppableColumn = ({ id, children, className, count, title }: { id: string; children: React.ReactNode; className?: string; count: number; title: string }) => {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div
       ref={setNodeRef}
-      className={`${className} ${
-        isOver ? 'ring-2 ring-brand-400 bg-brand-50 dark:bg-slate-800' : ''
+      className={`min-w-[300px] bg-slate-50 rounded-xl p-4 border border-slate-200 flex flex-col h-full ${
+        isOver ? 'ring-2 ring-brand-400 bg-brand-50' : ''
       } transition-all`}
     >
-      {children}
+      <div className="flex justify-between items-center mb-4 px-1">
+        <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wide flex items-center">
+          {title}
+        </h3>
+        <span className="bg-white px-2.5 py-0.5 rounded-full text-xs font-bold text-slate-500 shadow-sm border border-slate-100">
+          {count}
+        </span>
+      </div>
+      <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+        {children}
+      </div>
     </div>
   );
 };
 
-const DraggableCard = ({
-  lead,
-  onClick,
-  onDelete,
-  temp
-}: {
-  lead: Lead;
-  onClick: () => void;
-  onDelete: (e: any) => void;
-  temp: any;
-}) => {
+// 3. Card do Lead (Draggable)
+const DraggableCard = ({ lead, onClick, isAdmin }: { lead: Lead; onClick: () => void; isAdmin: boolean }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id });
-  const style = transform
-    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 999 }
-    : undefined;
+  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
 
   return (
     <div
@@ -61,484 +67,302 @@ const DraggableCard = ({
       {...listeners}
       {...attributes}
       onClick={onClick}
-      className={`bg-white dark:bg-dark-card p-3 rounded-lg shadow-sm border border-gray-100 dark:border-dark-border group relative overflow-hidden cursor-grab active:cursor-grabbing touch-none ${
-        isDragging ? 'opacity-50 rotate-3 scale-105 shadow-2xl' : 'hover:shadow-md hover:border-brand-300'
+      className={`bg-white p-4 rounded-xl shadow-sm border border-slate-100 group cursor-grab active:cursor-grabbing hover:shadow-md transition-all hover:-translate-y-1 relative ${
+        isDragging ? 'opacity-50 rotate-3 scale-105 z-50' : ''
       }`}
     >
-      <div className={`absolute left-0 top-0 bottom-0 w-1 ${temp.barColor}`}></div>
-
-      <div className="flex justify-between items-start mb-2 pl-2">
-        <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${temp.bg} ${temp.color}`}>
-          <temp.icon size={10} /> {temp.label} ({lead.score || 50})
-        </div>
-
-        <button
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={onDelete}
-          className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
-          title="Excluir lead"
-        >
-          <Icons.X size={14} />
-        </button>
+      {/* Header do Card */}
+      <div className="flex justify-between items-start mb-2">
+        <h4 className="font-bold text-slate-800 line-clamp-1">{lead.name}</h4>
+        {lead.score > 70 && <Icons.Flame size={14} className="text-orange-500" title="Lead Quente!" />}
       </div>
 
-      <div className="pl-2">
-        <h4 className="font-bold text-slate-800 dark:text-white leading-tight">{lead.name}</h4>
-
-        {lead.value && lead.value > 0 && (
-          <p className="text-xs font-bold text-green-600 dark:text-green-400 mt-1">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lead.value)}
-          </p>
-        )}
-
-        <div className="text-xs text-gray-500 dark:text-slate-400 space-y-1 mt-2 pb-2 border-b border-gray-50 dark:border-slate-700">
-          {lead.phone && (
-            <p className="flex items-center gap-1.5 truncate">
-              <Icons.Phone size={10} /> {lead.phone}
-            </p>
+      {/* Badges de Origem (Só Admin Vê) */}
+      {isAdmin && (
+        <div className="mb-3">
+          {lead.property?.agent ? (
+            <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded-md font-bold border border-indigo-100 flex items-center w-fit gap-1">
+              <Icons.User size={10} /> De: {lead.property.agent.name.split(' ')[0]}
+            </span>
+          ) : (
+            <span className="text-[10px] bg-brand-50 text-brand-600 px-2 py-1 rounded-md font-bold border border-brand-100 flex items-center w-fit gap-1">
+              <Icons.Shield size={10} /> Oficial
+            </span>
           )}
         </div>
+      )}
 
-        <div className="mt-2 flex justify-between items-center">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-            {lead.source || 'Site'}
-          </span>
-
-          <span className="text-[10px] text-gray-300 dark:text-slate-600 flex items-center gap-1">
-            <Icons.MoreVertical size={10} /> Arrastar
-          </span>
+      {/* Mensagem e Data */}
+      <p className="text-xs text-slate-500 mb-3 line-clamp-2 italic">
+        "{lead.message || 'Sem mensagem'}"
+      </p>
+      
+      <div className="flex justify-between items-center border-t border-slate-50 pt-2 mt-2">
+        <span className="text-[10px] text-slate-400 font-medium">
+          {new Date(lead.createdAt).toLocaleDateString()}
+        </span>
+        <div className="flex items-center gap-1">
+          <div className={`w-1.5 h-1.5 rounded-full ${lead.score > 50 ? 'bg-green-500' : 'bg-amber-400'}`}></div>
+          <span className="text-xs font-bold text-slate-600">{lead.score} pts</span>
         </div>
       </div>
     </div>
   );
 };
 
-const COLUMNS = [
-  { id: LeadStatus.NEW, label: 'Novos', color: 'border-blue-500' },
-  { id: (LeadStatus as any).QUALIFYING ?? LeadStatus.CONTACTED, label: 'Em Atendimento', color: 'border-amber-500' },
-  { id: LeadStatus.VISIT, label: 'Visitas', color: 'border-purple-500' },
-  { id: LeadStatus.PROPOSAL, label: 'Propostas', color: 'border-green-500' },
-  { id: LeadStatus.CLOSED, label: 'Fechados', color: 'border-emerald-600 bg-emerald-50' },
-  { id: LeadStatus.LOST, label: 'Perdidos', color: 'border-red-200 opacity-70' }
-];
-
-const getLeadTemperature = (score: number = 50) => {
-  if (score >= 80)
-    return {
-      label: 'Quente',
-      color: 'text-red-500',
-      bg: 'bg-red-50',
-      icon: Icons.TrendingUp,
-      barColor: 'bg-red-500'
-    };
-  if (score >= 40)
-    return {
-      label: 'Morno',
-      color: 'text-amber-500',
-      bg: 'bg-amber-50',
-      icon: Icons.Activity,
-      barColor: 'bg-amber-500'
-    };
-  return {
-    label: 'Frio',
-    color: 'text-blue-400',
-    bg: 'bg-blue-50',
-    icon: Icons.Clock,
-    barColor: 'bg-blue-300'
-  };
-};
+// === COMPONENTE PRINCIPAL ===
 
 const AdminLeads: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams(); // <--- Hook da URL
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [autoDistribution, setAutoDistribution] = useState(true);
 
-  const [showNewLeadModal, setShowNewLeadModal] = useState(false);
-  const [newLeadForm, setNewLeadForm] = useState({ name: '', phone: '', source: 'Manual' });
-  const [filterSource, setFilterSource] = useState('Todos');
-
-  // Controle da aba inicial do sidebar
-  const [sidebarTab, setSidebarTab] = useState<'info' | 'activity'>('info');
-
-  const [pendingMove, setPendingMove] = useState<{ id: string; status: LeadStatus } | null>(null);
-  const [showCloseModal, setShowCloseModal] = useState(false);
-  const [showLossModal, setShowLossModal] = useState(false);
-  const [closeValue, setCloseValue] = useState<number>(0);
-  const [lossReason, setLossReason] = useState('');
-
+  // DnD Sensors (Para evitar bugs de clique vs arraste)
   const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
   );
 
   const fetchLeads = async () => {
-    try {
-      setLoading(true);
-      let query = supabase.from('leads').select('*').order('score', { ascending: false });
+    setLoading(true);
+    // Query inteligente que traz dados do imóvel e do corretor dono
+    const { data, error } = await supabase
+      .from('leads')
+      .select(`
+        *,
+        property:properties (
+          title,
+          agent_id,
+          agent:profiles (name)
+        )
+      `)
+      .order('created_at', { ascending: false });
 
-      if (filterSource !== 'Todos') {
-        query = query.eq('source', filterSource);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      setLeads(data as any);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
+    if (error) console.error('Erro:', error);
+    else setLeads(data || []);
+    setLoading(false);
   };
 
   useEffect(() => {
     fetchLeads();
-  }, [filterSource]);
+  }, []);
 
-  // === EFEITO MÁGICO: Abrir Lead via URL (Vindo da Agenda) ===
-  useEffect(() => {
-    const leadIdToOpen = searchParams.get('open');
-    const tabToOpen = searchParams.get('tab');
-
-    if (leadIdToOpen && leads.length > 0) {
-      const targetLead = leads.find((l) => l.id === leadIdToOpen);
-      if (targetLead) {
-        setSelectedLead(targetLead);
-        if (tabToOpen === 'activity') setSidebarTab('activity');
-        else setSidebarTab('info');
-      }
-    }
-  }, [leads, searchParams]);
-
-  const handleCloseSidebar = () => {
-    setSelectedLead(null);
-    setSearchParams({});
-  };
-
-  const handleCreateLead = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newLeadForm.name || !newLeadForm.phone) return;
-
-    const { error } = await supabase.from('leads').insert([
-      {
-        name: newLeadForm.name,
-        phone: newLeadForm.phone,
-        source: newLeadForm.source,
-        status: LeadStatus.NEW,
-        score: 50,
-        value: 0
-      }
-    ]);
-
-    if (!error) {
-      setShowNewLeadModal(false);
-      setNewLeadForm({ name: '', phone: '', source: 'Manual' });
-      fetchLeads();
-    }
-  };
-
+  // Lógica ao soltar o card
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over) return;
 
     const leadId = active.id as string;
     const newStatus = over.id as LeadStatus;
+    const lead = leads.find(l => l.id === leadId);
 
-    const lead = leads.find((l) => l.id === leadId);
-    if (!lead || lead.status === newStatus) return;
+    if (lead && lead.status !== newStatus) {
+      // Atualiza visualmente (Otimista)
+      setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus } : l));
 
-    if (newStatus === LeadStatus.CLOSED) {
-      setPendingMove({ id: leadId, status: newStatus });
-      setCloseValue(lead.value || 0);
-      setShowCloseModal(true);
-      return;
-    }
-
-    if (newStatus === LeadStatus.LOST) {
-      setPendingMove({ id: leadId, status: newStatus });
-      setShowLossModal(true);
-      return;
-    }
-
-    executeMove(leadId, newStatus);
-  };
-
-  const executeMove = async (id: string, status: LeadStatus, extraData: any = {}) => {
-    // Otimista
-    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status, ...extraData } : l)));
-
-    await supabase.from('leads').update({ status, ...extraData }).eq('id', id);
-
-    setPendingMove(null);
-    setShowCloseModal(false);
-    setShowLossModal(false);
-    setLossReason('');
-
-    if (extraData.loss_reason) {
-      await supabase.from('timeline_events').insert([
-        { lead_id: id, type: 'status_change', description: `Lead perdido. Motivo: ${extraData.loss_reason}` }
-      ]);
-    } else if (status === LeadStatus.CLOSED) {
-      await supabase.from('timeline_events').insert([
-        { lead_id: id, type: 'status_change', description: `Venda Fechada! Valor: R$ ${extraData.value}` }
-      ]);
+      // Salva no banco
+      const { error } = await supabase.from('leads').update({ status: newStatus }).eq('id', leadId);
+      if (error) {
+        console.error('Erro ao mover:', error);
+        fetchLeads(); // Reverte em caso de erro
+      }
     }
   };
 
-  const confirmClose = () => {
-    if (pendingMove) executeMove(pendingMove.id, pendingMove.status, { value: closeValue, expected_close_date: new Date() });
-  };
-
-  const confirmLoss = () => {
-    if (pendingMove) executeMove(pendingMove.id, pendingMove.status, { loss_reason: lossReason });
-  };
-
-  const deleteLead = async (id: string, e: any) => {
-    e.stopPropagation();
-    if (!window.confirm('Excluir este lead permanentemente?')) return;
-
-    setLeads((prev) => prev.filter((l) => l.id !== id));
-    await supabase.from('leads').delete().eq('id', id);
-
-    if (selectedLead?.id === id) setSelectedLead(null);
-  };
-
-  if (loading && leads.length === 0) {
-    return <div className="p-8 text-center animate-pulse text-gray-500">Carregando Pipeline...</div>;
-  }
+  const getLeadsByStatus = (status: LeadStatus) => leads.filter(l => l.status === status);
 
   return (
-    <div className="h-[calc(100vh-100px)] flex flex-col">
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-6 px-4 flex-shrink-0">
+    <div className="space-y-8 animate-fade-in pb-20 h-full flex flex-col">
+      
+      {/* === CABEÇALHO === */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
         <div>
-          <h1 className="text-2xl font-serif font-bold text-slate-800 dark:text-white">Pipeline de Vendas</h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400">Gerencie seus negócios.</p>
+          <h1 className="text-3xl font-serif font-bold text-slate-800 flex items-center">
+            Gestão de Leads
+            <InfoTooltip text={TOOLTIPS.leads.pageTitle} />
+          </h1>
+          <p className="text-slate-500 mt-1">Acompanhe seu funil de vendas em tempo real.</p>
         </div>
 
-        <div className="flex gap-2">
-          <select
-            className="bg-white dark:bg-dark-card border border-gray-200 dark:border-dark-border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-500 dark:text-white"
-            value={filterSource}
-            onChange={(e) => setFilterSource(e.target.value)}
-          >
-            <option value="Todos">Todas as Origens</option>
-            <option value="Manual">Manual</option>
-            <option value="Site - Página do Imóvel">Site</option>
-            <option value="Instagram">Instagram</option>
-            <option value="Indicação">Indicação</option>
-          </select>
+        <div className="flex items-center gap-3">
+          {/* Controle de Distribuição (Apenas Admin) */}
+          {isAdmin && (
+            <div className="hidden md:flex items-center gap-3 bg-white px-4 py-2 rounded-xl border border-slate-200 shadow-sm mr-2">
+              <span className="text-sm font-bold text-slate-600 flex items-center gap-1">
+                Distribuição Automática
+                <InfoTooltip text={TOOLTIPS.leads.distribution} />
+              </span>
+              <button 
+                onClick={() => setAutoDistribution(!autoDistribution)}
+                className={`w-11 h-6 rounded-full p-1 transition-all duration-300 ${autoDistribution ? 'bg-brand-600' : 'bg-slate-300'}`}
+              >
+                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${autoDistribution ? 'translate-x-5' : 'translate-x-0'}`} />
+              </button>
+            </div>
+          )}
 
-          <button
-            onClick={() => setShowNewLeadModal(true)}
-            className="text-sm bg-brand-600 text-white hover:bg-brand-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg transition-all"
-          >
-            <Icons.Plus size={16} /> Novo Lead
-          </button>
+          {/* Troca de Visualização */}
+          <div className="bg-white border border-slate-200 p-1 rounded-xl flex shadow-sm">
+            <button 
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-slate-100 text-brand-600' : 'text-slate-400 hover:text-slate-600'}`}
+              title="Lista"
+            >
+              <Icons.Menu size={20} />
+            </button>
+            <button 
+              onClick={() => setViewMode('kanban')}
+              className={`p-2 rounded-lg transition-all ${viewMode === 'kanban' ? 'bg-slate-100 text-brand-600' : 'text-slate-400 hover:text-slate-600'}`}
+              title="Kanban"
+            >
+              <Icons.LayoutDashboard size={20} />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* KANBAN + DND */}
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <div className="flex-1 overflow-x-auto overflow-y-hidden px-4 pb-4">
-          <div className="flex gap-4 min-w-max h-full">
-            {COLUMNS.map((column) => {
-              const columnLeads = leads.filter((l) => l.status === column.id);
-
-              return (
-                <DroppableColumn
-                  key={String(column.id)}
-                  id={String(column.id)}
-                  className={`w-80 flex-shrink-0 rounded-xl flex flex-col h-full border-t-4 ${column.color} shadow-sm border-x border-b border-gray-200 dark:border-dark-border bg-gray-50/50 dark:bg-slate-900/50`}
-                >
-                  <div className="p-3 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-white/50 dark:bg-slate-800/50 rounded-t-lg">
-                    <h3 className="font-bold text-slate-700 dark:text-slate-200 text-sm uppercase tracking-wide">
-                      {column.label}
-                    </h3>
-                    <span className="bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-white text-xs px-2 py-0.5 rounded-full font-bold shadow-sm">
-                      {columnLeads.length}
-                    </span>
-                  </div>
-
-                  <div className="p-2 overflow-y-auto flex-1 space-y-2 custom-scrollbar">
-                    {columnLeads.map((lead) => (
-                      <DraggableCard
-                        key={lead.id}
-                        lead={lead}
-                        temp={getLeadTemperature(lead.score)}
-                        onClick={() => {
-                          setSelectedLead(lead);
-                          setSidebarTab('info');
-                        }}
-                        onDelete={(e) => deleteLead(lead.id, e)}
-                      />
-                    ))}
-
-                    {columnLeads.length === 0 && (
-                      <div className="h-20 flex items-center justify-center text-gray-300 dark:text-slate-600 border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-lg m-2">
-                        <span className="text-xs italic">Solte aqui</span>
+      {/* === ÁREA PRINCIPAL === */}
+      {viewMode === 'list' ? (
+        // === MODO LISTA ===
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex-1">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th className="text-left p-4 font-bold text-slate-600 text-sm">Cliente</th>
+                  <th className="text-left p-4 font-bold text-slate-600 text-sm flex items-center">
+                    Score <InfoTooltip text={TOOLTIPS.leads.table.score} />
+                  </th>
+                  <th className="text-left p-4 font-bold text-slate-600 text-sm flex items-center">
+                    Status <InfoTooltip text={TOOLTIPS.leads.table.status} />
+                  </th>
+                  
+                  {/* Coluna Exclusiva Admin */}
+                  {isAdmin && (
+                    <th className="text-left p-4 font-bold text-slate-600 text-sm flex items-center">
+                      Origem <InfoTooltip text={TOOLTIPS.leads.table.origin} />
+                    </th>
+                  )}
+                  
+                  <th className="text-left p-4 font-bold text-slate-600 text-sm">Interesse</th>
+                  <th className="text-right p-4 font-bold text-slate-600 text-sm">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {leads.map(lead => (
+                  <tr key={lead.id} className="hover:bg-slate-50 transition-colors group cursor-pointer" onClick={() => setSelectedLead(lead)}>
+                    <td className="p-4">
+                      <p className="font-bold text-slate-800">{lead.name}</p>
+                      <p className="text-xs text-slate-400 font-medium">{lead.phone}</p>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2 bg-slate-100 rounded-full w-16 overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full ${lead.score > 70 ? 'bg-green-500' : lead.score > 40 ? 'bg-amber-500' : 'bg-slate-300'}`} 
+                            style={{ width: `${lead.score}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-bold text-slate-600">{lead.score}</span>
                       </div>
+                    </td>
+                    <td className="p-4">
+                      <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider
+                        ${lead.status === LeadStatus.NEW ? 'bg-blue-100 text-blue-700' : 
+                          lead.status === LeadStatus.CLOSED ? 'bg-green-100 text-green-700' : 
+                          lead.status === LeadStatus.LOST ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}
+                      `}>
+                        {lead.status}
+                      </span>
+                    </td>
+
+                    {/* Dados da Origem (Admin) */}
+                    {isAdmin && (
+                      <td className="p-4">
+                        {lead.property?.agent ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold border border-indigo-100">
+                              {lead.property.agent.name.charAt(0)}
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-slate-700">{lead.property.agent.name}</p>
+                              <p className="text-[10px] text-slate-400 font-medium uppercase">Parceiro</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center text-xs font-bold border border-brand-100">
+                              <Icons.Shield size={14} />
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-slate-700">TR Imóveis</p>
+                              <p className="text-[10px] text-slate-400 font-medium uppercase">Oficial</p>
+                            </div>
+                          </div>
+                        )}
+                      </td>
                     )}
-                  </div>
+
+                    <td className="p-4">
+                      <p className="text-sm text-slate-600 truncate max-w-[180px]" title={lead.property?.title}>
+                        {lead.property?.title || 'Interesse Geral'}
+                      </p>
+                    </td>
+                    <td className="p-4 text-right">
+                      <button className="text-slate-400 hover:text-brand-600 p-2 rounded-full hover:bg-slate-100 transition-colors">
+                        <Icons.ArrowRight size={18} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        // === MODO KANBAN (DnD) ===
+        <div className="flex-1 overflow-x-auto pb-4">
+          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+            <div className="flex gap-4 h-full min-w-max pb-2">
+              {Object.values(LeadStatus).map(status => (
+                <DroppableColumn 
+                  key={status} 
+                  id={status} 
+                  title={status} 
+                  count={getLeadsByStatus(status).length}
+                >
+                  {getLeadsByStatus(status).map(lead => (
+                    <DraggableCard 
+                      key={lead.id} 
+                      lead={lead} 
+                      isAdmin={isAdmin}
+                      onClick={() => setSelectedLead(lead)} 
+                    />
+                  ))}
                 </DroppableColumn>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          </DndContext>
         </div>
-      </DndContext>
+      )}
 
-      {/* SIDEBAR */}
+      {/* Sidebar de Detalhes */}
       {selectedLead && (
-        <LeadDetailsSidebar
-          lead={selectedLead}
-          onClose={handleCloseSidebar}
-          onUpdate={fetchLeads}
-          initialTab={sidebarTab}
+        <LeadDetailsSidebar 
+          lead={selectedLead} 
+          onClose={() => setSelectedLead(null)} 
+          onStatusChange={async (newStatus) => {
+            // Atualização rápida
+            setLeads(prev => prev.map(l => l.id === selectedLead.id ? { ...l, status: newStatus } : l));
+            const { error } = await supabase.from('leads').update({ status: newStatus }).eq('id', selectedLead.id);
+            if (error) fetchLeads();
+          }}
         />
-      )}
-
-      {/* MODAL NOVO LEAD */}
-      {showNewLeadModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-dark-card rounded-xl shadow-2xl p-6 w-full max-w-md animate-slide-up border border-gray-100 dark:border-dark-border">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-bold text-slate-800 dark:text-white">Adicionar Lead Manual</h3>
-              <button onClick={() => setShowNewLeadModal(false)}>
-                <Icons.X className="text-gray-400 hover:text-red-500" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateLead} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nome</label>
-                <input
-                  autoFocus
-                  type="text"
-                  required
-                  className="w-full border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-brand-500"
-                  value={newLeadForm.name}
-                  onChange={(e) => setNewLeadForm({ ...newLeadForm, name: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Telefone</label>
-                <input
-                  type="tel"
-                  required
-                  className="w-full border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-brand-500"
-                  value={newLeadForm.phone}
-                  onChange={(e) => setNewLeadForm({ ...newLeadForm, phone: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Origem</label>
-                <select
-                  className="w-full border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-brand-500"
-                  value={newLeadForm.source}
-                  onChange={(e) => setNewLeadForm({ ...newLeadForm, source: e.target.value })}
-                >
-                  <option value="Manual">Manual</option>
-                  <option value="Indicação">Indicação</option>
-                </select>
-              </div>
-
-              <div className="pt-4">
-                <button
-                  type="submit"
-                  className="w-full bg-slate-900 dark:bg-brand-600 text-white font-bold py-3 rounded-lg hover:bg-slate-800 transition-colors"
-                >
-                  Cadastrar Lead
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL FECHAMENTO */}
-      {showCloseModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-dark-card rounded-xl shadow-2xl p-6 w-full max-w-sm animate-slide-up border-t-4 border-green-500">
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">🎉 Venda Realizada!</h3>
-            <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">Confirme o valor final.</p>
-
-            <div className="mb-4">
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Valor Final (R$)</label>
-              <input
-                type="number"
-                autoFocus
-                className="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white rounded-lg px-4 py-3 text-lg font-bold text-green-700 outline-none focus:ring-2 focus:ring-green-500"
-                value={closeValue}
-                onChange={(e) => setCloseValue(Number(e.target.value))}
-              />
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setShowCloseModal(false);
-                  setPendingMove(null);
-                }}
-                className="flex-1 py-3 text-gray-500 font-bold hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
-              >
-                Cancelar
-              </button>
-
-              <button
-                onClick={confirmClose}
-                className="flex-1 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-lg shadow-green-200"
-              >
-                Confirmar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL PERDA */}
-      {showLossModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-dark-card rounded-xl shadow-2xl p-6 w-full max-w-sm animate-slide-up border-t-4 border-red-400">
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">😕 Lead Perdido</h3>
-            <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">Qual foi o motivo?</p>
-
-            <div className="mb-4">
-              <select
-                className="w-full border border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-red-500"
-                value={lossReason}
-                onChange={(e) => setLossReason(e.target.value)}
-              >
-                <option value="">Selecione...</option>
-                <option value="Preço alto">💰 Preço alto</option>
-                <option value="Comprou concorrente">🏢 Comprou concorrente</option>
-                <option value="Desistiu da compra">❌ Desistiu</option>
-              </select>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setShowLossModal(false);
-                  setPendingMove(null);
-                }}
-                className="flex-1 py-3 text-gray-500 font-bold hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
-              >
-                Cancelar
-              </button>
-
-              <button
-                disabled={!lossReason}
-                onClick={confirmLoss}
-                className="flex-1 py-3 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600 disabled:opacity-50"
-              >
-                Confirmar
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

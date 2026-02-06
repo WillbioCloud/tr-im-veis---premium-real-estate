@@ -95,6 +95,19 @@ export interface Lead {
   createdAt: string;
   source: string;
   assigned_to?: string; // <--- NOVO: ID do corretor dono
+  // JOIN: Dados expandidos do Imóvel e do Dono do Imóvel
+  property?: {
+    title: string;
+    agent_id?: string;
+    agent?: {
+      name: string;
+    };
+  };
+
+  // JOIN: Quem está atendendo (Assignee)
+  assignee?: {
+    name: string;
+  };
   
   // Campos CRM Premium
   value?: number;          // Valor potencial

@@ -108,4 +108,5 @@ export const Icons = {
   Upload,
   FileSpreadsheet,
   House,
+  LayoutDashboard,
 };
