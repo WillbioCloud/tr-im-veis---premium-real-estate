@@ -50,6 +50,7 @@ import {
   Check,
   Upload,
   FileSpreadsheet,
+  House,
 } from 'lucide-react';
 
 export const Icons = {
@@ -106,4 +107,5 @@ export const Icons = {
   Check,
   Upload,
   FileSpreadsheet,
+  House,
 };

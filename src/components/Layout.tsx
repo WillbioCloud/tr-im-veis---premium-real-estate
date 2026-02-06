@@ -19,8 +19,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <div className="bg-slate-900 text-white py-2 text-xs md:text-sm">
         <div className="container mx-auto px-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1"><Icons.Mail size={14} /> contato@trimoveis.com</span>
-            <span className="flex items-center gap-1"><Icons.Phone size={14} /> (11) 3333-4444</span>
+            <span className="flex items-center gap-1"><Icons.House size={14} /> Venda seu Imóvel Conosco</span>
+            <Link to="https://wa.me/5564996234208" target="_blank" className="flex items-center gap-1 hover:text-amber-400 transition-colors"><Icons.Phone size={14} /> (64) 99623-4208</Link>
           </div>
           <div className="hidden md:flex gap-4">
             <Link to="/admin/login" className="hover:text-amber-400 transition-colors">Área do Corretor</Link>
@@ -61,7 +61,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="py-2 border-b">Home</Link>
             <Link to="/imoveis" onClick={() => setIsMobileMenuOpen(false)} className="py-2 border-b">Imóveis</Link>
             <Link to="/servicos" onClick={() => setIsMobileMenuOpen(false)} className="py-2 border-b">Serviços</Link>
-            <Link to="/admin/login" onClick={() => setIsMobileMenuOpen(false)} className="py-2 text-slate-500">Área Restrita</Link>
+            <Link to="/admin/login" onClick={() => setIsMobileMenuOpen(false)} className="py-2 text-slate-500">Área do Corretor</Link>
             <Link to="/contato" onClick={() => setIsMobileMenuOpen(false)} className="py-3 text-center bg-amber-500 text-white rounded-lg font-bold">
               Fale Conosco
             </Link>
