@@ -8,10 +8,10 @@ export enum PropertyType {
 
 export enum LeadStatus {
   NEW = 'Novo',
+  CONTACTED = 'Em Contato',
   QUALIFYING = 'Qualificando',
   VISIT = 'Visita Agendada',
   PROPOSAL = 'Proposta',
-  CONTACTED = 'Em Contato',
   CLOSED = 'Fechado',
   LOST = 'Perdido'
 }

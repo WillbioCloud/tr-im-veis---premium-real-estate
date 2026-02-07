@@ -14,44 +14,63 @@ const Properties: React.FC = () => {
   const currentCity = searchParams.get('city') || '';
   const currentType = searchParams.get('type') || '';
 
-  // Carregar Imóveis com Filtros
   useEffect(() => {
     async function fetchProperties() {
       setLoading(true);
       
-      let query = supabase.from('properties').select('*');
+      try {
+        // === CORREÇÃO DA QUERY ===
+        // Removemos o 'agent:' e buscamos 'profiles' puro para evitar o Erro 400
+        let query = supabase
+          .from('properties')
+          .select('*, profiles(name, phone, email)'); 
 
-      // Aplica filtros se existirem na URL
-      if (currentCity) {
-        // ilike faz busca case-insensitive (ignora maiuscula/minuscula)
-        query = query.ilike('location->>city', `%${currentCity}%`);
-      }
-      
-      if (currentType) {
-        query = query.eq('type', currentType);
-      }
+        if (currentCity) {
+          query = query.ilike('city', `%${currentCity}%`);
+        }
+        
+        if (currentType) {
+          query = query.eq('type', currentType);
+        }
 
-      const { data, error } = await query;
+        const { data, error } = await query;
 
-      if (data) {
-        // Mapping necessário se o objeto location vier plano do banco ou JSON
-        const mappedData = data.map((item: any) => ({
-          ...item,
-          // Garante que location seja objeto se o banco retornou JSON
-          location: typeof item.location === 'string' ? JSON.parse(item.location) : item.location
-        }));
-        setProperties(mappedData);
-      } else {
-        console.error(error);
+        if (error) {
+          console.error("Erro Supabase:", error);
+          throw error;
+        }
+
+        if (data) {
+          // === MAPEAMENTO ROBUSTO ===
+          const mappedData: Property[] = data.map((item: any) => ({
+            ...item,
+            // 1. Garante que 'location' exista para o PropertyCard não quebrar
+            location: {
+              city: item.city || '',
+              neighborhood: item.neighborhood || '',
+              state: item.state || '',
+              address: item.address || ''
+            },
+            // 2. Transforma 'profiles' (do banco) em 'agent' (do front-end)
+            // O Supabase pode retornar 'profiles' como objeto ou array, tratamos os dois.
+            agent: Array.isArray(item.profiles) ? item.profiles[0] : item.profiles,
+            
+            features: item.features || [],
+            images: item.images || []
+          }));
+          
+          setProperties(mappedData);
+        }
+      } catch (err) {
+        console.error("Falha ao buscar imóveis:", err);
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     }
 
     fetchProperties();
   }, [currentCity, currentType]);
 
-  // Handler para atualizar filtros
   const handleFilterChange = (key: string, value: string) => {
     if (value) {
       searchParams.set(key, value);
@@ -62,34 +81,31 @@ const Properties: React.FC = () => {
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen py-10">
+    <div className="bg-gray-50 min-h-screen py-20 animate-fade-in">
       <div className="container mx-auto px-4">
         
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-12 gap-6">
           <div>
-            <h1 className="text-3xl font-serif font-bold text-slate-900">Nossos Imóveis</h1>
-            <p className="text-gray-500 mt-1">
-              {loading ? 'Buscando...' : `${properties.length} imóveis encontrados`}
-              {currentCity && ` em "${currentCity}"`}
-            </p>
+            <h1 className="text-4xl font-serif font-bold text-slate-800 mb-2">Imóveis Exclusivos</h1>
+            <p className="text-slate-500">Encontre o lar dos seus sonhos em nossa seleção premium.</p>
           </div>
-          
-          {/* Barra de Filtros Simples */}
-          <div className="flex gap-2 bg-white p-2 rounded-lg shadow-sm border border-gray-200">
-             <div className="relative">
-               <Icons.MapPin className="absolute left-3 top-3 text-gray-400" size={16}/>
+
+          <div className="flex gap-4 w-full md:w-auto">
+             <div className="relative flex-1 md:w-64">
+               <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                <input 
                  type="text" 
-                 placeholder="Cidade..." 
-                 className="pl-9 pr-4 py-2 bg-gray-50 rounded-md text-sm outline-none focus:ring-2 focus:ring-amber-500 w-40"
+                 placeholder="Filtrar por cidade..." 
+                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-brand-500 outline-none transition-all shadow-sm"
                  value={currentCity}
-                 onChange={(e) => handleFilterChange('city', e.target.value)}
+                 onChange={e => handleFilterChange('city', e.target.value)}
                />
              </div>
+             
              <select 
-               className="px-4 py-2 bg-gray-50 rounded-md text-sm outline-none focus:ring-2 focus:ring-amber-500 border-r-8 border-transparent"
+               className="pl-4 pr-10 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-brand-500 outline-none bg-white shadow-sm cursor-pointer"
                value={currentType}
-               onChange={(e) => handleFilterChange('type', e.target.value)}
+               onChange={e => handleFilterChange('type', e.target.value)}
              >
                <option value="">Todos os Tipos</option>
                {Object.values(PropertyType).map(t => (
@@ -115,16 +131,15 @@ const Properties: React.FC = () => {
           <div className="text-center py-20 bg-white rounded-xl shadow-sm border border-dashed border-gray-300">
             <Icons.Search className="mx-auto text-gray-300 mb-4" size={48} />
             <h3 className="text-xl font-bold text-gray-700">Nenhum imóvel encontrado</h3>
-            <p className="text-gray-500">Tente ajustar os filtros ou buscar por outra cidade.</p>
+            <p className="text-gray-500">Tente ajustar os filtros ou verificar a conexão.</p>
             <button 
               onClick={() => setSearchParams({})}
-              className="mt-4 text-amber-600 font-bold hover:underline"
+              className="mt-4 text-brand-600 font-bold hover:underline"
             >
-              Limpar filtros
+              Limpar Filtros
             </button>
           </div>
         )}
-
       </div>
     </div>
   );

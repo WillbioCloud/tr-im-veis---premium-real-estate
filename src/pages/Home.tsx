@@ -77,7 +77,7 @@ const Home: React.FC = () => {
               <Icons.Home size={28} />
             </div>
             <div>
-              <h3 className="font-bold text-slate-800 dark:text-white text-lg">Casas de Luxo</h3>
+              <h3 className="font-bold text-slate-800 dark:text-white text-lg">Casas à venda</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400">Ver opções disponíveis</p>
             </div>
           </div>
@@ -87,16 +87,16 @@ const Home: React.FC = () => {
             </div>
             <div>
               <h3 className="font-bold text-slate-800 dark:text-white text-lg">Apartamentos</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Alto padrão e conforto</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Ver opções disponíveis</p>
             </div>
           </div>
-          <div onClick={() => navigate('/imoveis?type=Comercial')} className="bg-white dark:bg-dark-card p-6 rounded-xl shadow-xl hover:-translate-y-1 transition-all cursor-pointer flex items-center gap-4 border border-brand-50 dark:border-dark-border group">
+          <div onClick={() => navigate('/imoveis?type=Terreno')} className="bg-white dark:bg-dark-card p-6 rounded-xl shadow-xl hover:-translate-y-1 transition-all cursor-pointer flex items-center gap-4 border border-brand-50 dark:border-dark-border group">
             <div className="p-4 bg-brand-50 dark:bg-slate-800 rounded-full text-brand-600 group-hover:bg-brand-600 group-hover:text-white transition-colors">
               <Icons.TrendingUp size={28} />
             </div>
             <div>
-              <h3 className="font-bold text-slate-800 dark:text-white text-lg">Investimentos</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Oportunidades comerciais</p>
+              <h3 className="font-bold text-slate-800 dark:text-white text-lg">Lotes</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Oportunidades em terrenos</p>
             </div>
           </div>
         </div>

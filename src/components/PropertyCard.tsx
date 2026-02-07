@@ -67,11 +67,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
               {property.agent ? property.agent.name.split(' ')[0] : 'TR Imóveis'}
             </p>
           </div>
-          {property.agent && (
-            <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full font-bold">
-              Parceiro
-            </span>
-          )}
+          <Icons.ArrowRight size={18} className="text-gray-400" />
         </div>
       </div>
     </Link>
