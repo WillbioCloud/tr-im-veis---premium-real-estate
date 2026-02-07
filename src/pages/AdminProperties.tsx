@@ -5,9 +5,21 @@ import { Property } from '../types';
 import { Icons } from '../components/Icons';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../contexts/AuthContext';
+import { TOOLTIPS } from '../constants/tooltips'; // <--- Importando Textos
 
 const formatBRL = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
+
+// Componente de Tooltip (Copiado para manter padrão)
+const InfoTooltip = ({ text }: { text: string }) => (
+  <div className="group relative inline-flex items-center ml-2 z-20">
+    <Icons.Info size={14} className="text-slate-400 cursor-help hover:text-brand-500 transition-colors" />
+    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden w-56 p-2 bg-slate-800 text-white text-xs rounded-lg shadow-xl group-hover:block z-50 text-center leading-relaxed font-normal">
+      {text}
+      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 h-2 w-2 -rotate-45 bg-slate-800"></div>
+    </div>
+  </div>
+);
 
 const AdminProperties: React.FC = () => {
   const { user } = useAuth();
@@ -34,8 +46,6 @@ const AdminProperties: React.FC = () => {
       if (error) throw error;
 
       if (data) {
-        // === CORREÇÃO DO ERRO ===
-        // Mapeamos os dados "soltos" do banco para o objeto 'location' que o código espera
         const formattedData: Property[] = data.map((item: any) => ({
           ...item,
           location: item.location || {
@@ -116,7 +126,6 @@ const AdminProperties: React.FC = () => {
     }
   };
 
-  // Filtragem local (com Proteção contra erro)
   const filteredProperties = useMemo(() => {
     return properties.filter(p => {
       const neighborhood = p.location?.neighborhood?.toLowerCase() || '';
@@ -135,8 +144,9 @@ const AdminProperties: React.FC = () => {
       
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-slate-800">
+          <h1 className="text-3xl font-serif font-bold text-slate-800 flex items-center">
             {isAdmin ? 'Todos os Imóveis' : 'Meus Imóveis'}
+            <InfoTooltip text={TOOLTIPS.properties.pageTitle} />
           </h1>
           <p className="text-slate-500">Gerencie o portfólio imobiliário.</p>
         </div>
@@ -146,7 +156,9 @@ const AdminProperties: React.FC = () => {
             onClick={() => setIsImportModalOpen(true)}
             className="px-4 py-3 rounded-xl font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
           >
-            <Icons.Upload size={18} /> Importar Excel
+            <Icons.Upload size={18} /> 
+            Importar Excel
+            <InfoTooltip text={TOOLTIPS.properties.import} />
           </button>
           
           <Link 
@@ -192,9 +204,15 @@ const AdminProperties: React.FC = () => {
                 <tr>
                   <th className="p-4">Imóvel</th>
                   <th className="p-4">Preço</th>
-                  {isAdmin && <th className="p-4">Responsável</th>}
+                  {isAdmin && (
+                    <th className="p-4 flex items-center">
+                      Responsável <InfoTooltip text={TOOLTIPS.properties.responsible} />
+                    </th>
+                  )}
                   <th className="p-4">Localização</th>
-                  <th className="p-4 text-right">Ações</th>
+                  <th className="p-4 text-right">
+                    Ações <InfoTooltip text={TOOLTIPS.properties.actions} />
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 text-sm text-slate-600">
@@ -244,7 +262,6 @@ const AdminProperties: React.FC = () => {
                       )}
 
                       <td className="p-4">
-                        {/* Proteção contra undefined com Optional Chaining (?) */}
                         {property.location?.neighborhood || 'Bairro N/A'}, {property.location?.city || 'Cidade N/A'}
                       </td>
                       <td className="p-4 text-right">
@@ -266,7 +283,7 @@ const AdminProperties: React.FC = () => {
         </div>
       )}
 
-      {/* Modal de Importação */}
+      {/* Modal de Importação (Conteúdo igual ao anterior...) */}
       {isImportModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl animate-fade-in overflow-hidden">

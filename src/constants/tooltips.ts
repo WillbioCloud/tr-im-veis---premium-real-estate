@@ -8,6 +8,12 @@ export const TOOLTIPS = {
       status: "Clique para atualizar o estágio do cliente no funil de vendas."
     }
   },
+  properties: {
+    pageTitle: "Gerencie o portfólio de imóveis. Adicione, edite ou remova propriedades do site.",
+    import: "Importe múltiplos imóveis de uma vez usando uma planilha Excel (.xlsx).",
+    responsible: "Indica quem é o captador deste imóvel (Corretor ou Imobiliária).",
+    actions: "Edite as informações ou exclua o imóvel do sistema."
+  },
   dashboard: {
     scoreHelp: {
       title: "Como funciona o Score?",
