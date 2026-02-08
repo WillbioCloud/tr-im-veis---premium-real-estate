@@ -1,183 +1,139 @@
-import React, { useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
+import React, { useState } from 'react';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
-import { COMPANY_NAME } from '../constants';
+import { useAuth } from '../contexts/AuthContext';
 
-type MenuItem = {
-  label: string;
-  path: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-};
-
-const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { signOut } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+const AdminLayout: React.FC = () => {
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     await signOut();
     navigate('/admin/login');
   };
 
-  const isActive = (path: string) =>
-    location.pathname === path || location.pathname.startsWith(`${path}/`);
-
-  const menuItems: MenuItem[] = useMemo(
-    () => [
-      { label: 'Dashboard', path: '/admin/dashboard', icon: Icons.Dashboard },
-      { label: 'Agenda', path: '/admin/tarefas', icon: Icons.Calendar },
-      { label: 'Imóveis', path: '/admin/imoveis', icon: Icons.Building },
-      { label: 'Leads (CRM)', path: '/admin/leads', icon: Icons.Users },
-      { label: 'Configurações', path: '/admin/config', icon: Icons.Settings },
-    ],
-    []
-  );
-
-  const SidebarContent = () => (
-    <div className="h-full flex flex-col">
-      {/* Brand */}
-      <div className="px-7 py-7 border-b border-white/10">
-        <Link
-          to="/"
-          className="text-2xl font-serif font-bold tracking-wide text-white/95 hover:text-white transition-colors"
-          onClick={() => setMobileOpen(false)}
-        >
-          {COMPANY_NAME}
-        </Link>
-        <div className="mt-2 flex items-center gap-2">
-          <span className="crm-pill">CRM</span>
-          <span className="text-[11px] text-slate-400 font-extrabold uppercase tracking-widest">
-            Nexus Style
-          </span>
-        </div>
-      </div>
-
-      {/* Nav */}
-      <nav className="flex-1 px-4 py-6 space-y-2">
-        {menuItems.map((item) => {
-          const active = isActive(item.path);
-          const Icon = item.icon;
-
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              onClick={() => setMobileOpen(false)}
-              className={[
-                'group relative flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm font-extrabold transition-all duration-200',
-                active
-                  ? 'bg-white/10 text-white shadow-soft2'
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white',
-              ].join(' ')}
-            >
-              {/* Barra verde do ativo (muito parecida com a UI do print) */}
-              {active && (
-                <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-crm-primary" />
-              )}
-
-              <Icon
-                size={20}
-                className={[
-                  'transition-colors',
-                  active ? 'text-white' : 'text-slate-500 group-hover:text-white',
-                ].join(' ')}
-              />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Footer actions */}
-      <div className="px-5 py-5 border-t border-white/10 space-y-2">
-        <button
-          onClick={toggleTheme}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-extrabold text-slate-400 hover:bg-white/5 hover:text-white transition-colors"
-        >
-          {theme === 'dark' ? <Icons.Sun size={18} /> : <Icons.Moon size={18} />}
-          {theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
-        </button>
-
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-extrabold text-red-300/80 hover:bg-red-500/10 hover:text-red-300 transition-colors"
-        >
-          <Icons.LogOut size={18} />
-          Sair
-        </button>
-      </div>
-    </div>
-  );
+  const menuItems = [
+    { label: 'Dashboard', path: '/admin/dashboard', icon: Icons.Dashboard },
+    { label: 'Leads (CRM)', path: '/admin/leads', icon: Icons.Users },
+    { label: 'Imóveis', path: '/admin/imoveis', icon: Icons.Building },
+    { label: 'Tarefas', path: '/admin/tarefas', icon: Icons.Calendar },
+    { label: 'Configurações', path: '/admin/config', icon: Icons.Settings },
+  ];
 
   return (
-    <div className="min-h-screen bg-crm-bg dark:bg-dark-bg flex transition-colors duration-300 font-sans">
+    <div className="flex h-screen bg-slate-900 overflow-hidden font-sans">
+      
       {/* Sidebar Desktop */}
-      <aside className="w-72 bg-crm-navy text-white hidden md:flex flex-col shadow-2xl z-20">
-        <SidebarContent />
-      </aside>
-
-      {/* Overlay + Drawer Mobile */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setMobileOpen(false)}
-          />
-          <aside className="absolute left-0 top-0 h-full w-72 bg-crm-navy text-white shadow-2xl">
-            <SidebarContent />
-          </aside>
+      <aside className="hidden md:flex flex-col w-64 bg-slate-900 text-white shadow-xl relative z-20">
+        <div className="p-6 border-b border-slate-800">
+          <h1 className="text-2xl font-serif font-bold tracking-wide text-brand-400">TR Imóveis</h1>
+          <p className="text-xs text-slate-500 uppercase tracking-widest mt-1">Gestão Premium</p>
         </div>
-      )}
 
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        {/* Header */}
-        <header className="bg-white dark:bg-dark-card border-b border-crm-border dark:border-dark-border px-4 md:px-8 py-4 flex items-center justify-between z-20">
-          <div className="flex items-center gap-3">
-            {/* Mobile menu button */}
-            <button
-              className="md:hidden p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-              onClick={() => setMobileOpen(true)}
-              aria-label="Abrir menu"
+        <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto custom-scrollbar">
+          {menuItems.map(item => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) => `
+                flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group
+                ${isActive 
+                  ? 'bg-brand-600 text-white shadow-lg shadow-brand-900/20' 
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'}
+              `}
             >
-              <Icons.Menu />
-            </button>
+              <item.icon size={20} className="group-hover:scale-110 transition-transform" />
+              <span className="font-medium text-sm">{item.label}</span>
+            </NavLink>
+          ))}
+        </nav>
 
-            <div className="leading-tight">
-              <div className="text-sm font-extrabold text-crm-text dark:text-white">
-                {COMPANY_NAME}
-              </div>
-              <div className="text-xs font-bold text-crm-muted dark:text-dark-muted">
-                Painel Administrativo
+        {/* === PERFIL DO USUÁRIO (RODAPÉ) === */}
+        <div className="p-4 border-t border-slate-800 bg-slate-900/50">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full bg-brand-500 flex items-center justify-center text-white font-bold text-lg shadow-md border-2 border-slate-700 shrink-0">
+              {user?.name?.charAt(0) || 'U'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white truncate">
+                {user?.name || 'Usuário'}
+              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <div className={`w-1.5 h-1.5 rounded-full ${user?.role === 'admin' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold truncate">
+                  {user?.role === 'admin' ? 'Administrador' : 'Corretor'}
+                </p>
               </div>
             </div>
           </div>
+          
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-slate-800 hover:bg-red-500/10 hover:text-red-400 text-slate-400 text-xs font-bold transition-all border border-slate-700 hover:border-red-500/20"
+          >
+            <Icons.LogOut size={14} /> Sair do Sistema
+          </button>
+        </div>
+      </aside>
 
-          {/* Right actions (estilo “topbar clean”) */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleTheme}
-              className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg border border-crm-border dark:border-dark-border bg-white dark:bg-dark-card text-crm-body dark:text-dark-text hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-sm font-bold"
-              title="Alternar tema"
-            >
-              {theme === 'dark' ? <Icons.Sun size={16} /> : <Icons.Moon size={16} />}
-              <span className="hidden md:inline">
-                {theme === 'dark' ? 'Claro' : 'Escuro'}
-              </span>
-            </button>
-          </div>
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50 md:rounded-l-[2.5rem] shadow-2xl relative z-10">
+        {/* Mobile Header */}
+        <header className="md:hidden flex items-center justify-between p-4 bg-white border-b border-slate-100">
+          <div className="font-serif font-bold text-slate-800">TR Imóveis</div>
+          <button 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+            className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <Icons.Menu />
+          </button>
         </header>
 
-        {/* Scroll Area */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-          <div className="max-w-7xl mx-auto pb-10">{children}</div>
-        </main>
-      </div>
+        {/* Mobile Menu Dropdown */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden absolute top-[60px] left-0 right-0 bg-white border-b border-slate-100 shadow-xl z-50 p-4 space-y-2 animate-in fade-in slide-in-from-top-4 duration-200">
+            {menuItems.map(item => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={({ isActive }) => `
+                  flex items-center gap-3 px-4 py-3 rounded-lg
+                  ${isActive ? 'bg-brand-50 text-brand-700 font-bold' : 'text-slate-600'}
+                `}
+              >
+                <item.icon size={20} />
+                {item.label}
+              </NavLink>
+            ))}
+            <div className="pt-4 border-t border-slate-100 mt-2">
+              <div className="flex items-center gap-3 px-4 py-2">
+                <div className="w-9 h-9 rounded-full bg-brand-500 flex items-center justify-center text-white font-bold">
+                  {user?.name?.charAt(0)}
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-700">{user?.name}</p>
+                  <p className="text-xs text-slate-500 capitalize">{user?.role}</p>
+                </div>
+              </div>
+              <button 
+                onClick={handleLogout} 
+                className="w-full text-left px-4 py-3 text-red-500 text-sm font-bold flex items-center gap-2"
+              >
+                <Icons.LogOut size={16} /> Sair
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+          <div className="max-w-7xl mx-auto pb-10">
+            <Outlet />
+          </div>
+        </div>
+      </main>
     </div>
   );
 };
