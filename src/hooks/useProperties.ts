@@ -8,15 +8,28 @@ export function useProperties() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true; // Variável de controle para evitar AbortError
+
     async function fetchProperties() {
       try {
-        // Query corrigida: sem alias 'agent:'
+        setLoading(true);
+        
+        // Busca otimizada trazendo dados dos perfis relacionados
         const { data, error } = await supabase
           .from('properties')
-          .select('*, profiles(name, phone, email)')
+          .select(`
+            *,
+            profiles (name, email, phone)
+          `)
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (!isMounted) return;
+
+        if (error) {
+          // Ignora erro de cancelamento natural do React
+          if (error.message?.includes('AbortError')) return;
+          throw error;
+        }
 
         if (data) {
           const mappedProperties: Property[] = data.map((p: any) => ({
@@ -29,20 +42,27 @@ export function useProperties() {
             },
             features: p.features || [],
             images: p.images || [],
-            // Mapeia profiles -> agent
+            // Mapeamento seguro do agente a partir do perfil
             agent: Array.isArray(p.profiles) ? p.profiles[0] : p.profiles
           }));
           
           setProperties(mappedProperties);
         }
       } catch (err: any) {
-        setError(err.message);
+        if (isMounted) {
+          console.error("Erro ao buscar imóveis:", err.message);
+          setError(err.message);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
 
     fetchProperties();
+
+    return () => {
+      isMounted = false; // Cancela atualizações se o componente fechar
+    };
   }, []);
 
   return { properties, loading, error };
