@@ -51,6 +51,8 @@ import {
   Upload,
   FileSpreadsheet,
   House,
+  Send,
+  List,
 } from 'lucide-react';
 
 export const Icons = {
@@ -109,4 +111,6 @@ export const Icons = {
   FileSpreadsheet,
   House,
   LayoutDashboard,
+  Send,
+  List,
 };
