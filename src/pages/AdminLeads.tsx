@@ -214,16 +214,19 @@ const AdminLeads: React.FC = () => {
   );
 
   const fetchLeads = async () => {
+    // O Supabase vai aplicar as regras de segurança automaticamente aqui
     const { data } = await supabase
       .from('leads')
-      .select(
-        `
+      .select(`
         *,
-        property:properties (title, agent_id, agent:profiles (name))
-      `
-      )
+        property:properties (
+          title,
+          agent_id,
+          agent:profiles (name)
+        )
+      `)
       .order('created_at', { ascending: false });
-
+    
     if (data) setLeads(data as any);
   };
 
