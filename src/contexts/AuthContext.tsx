@@ -1,136 +1,97 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import type { Session, User } from '@supabase/supabase-js';
 
 export type UserWithRole = User & {
-  role?: 'admin' | 'corretor';
   name?: string;
+  role?: string;
 };
 
+// Define o formato do contexto
 interface AuthContextType {
   session: Session | null;
   user: UserWithRole | null;
   loading: boolean;
-  signIn: (email: string, pass: string) => Promise<void>;
-  signUp: (email: string, pass: string, name: string, phone: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (name: string, email: string, password: string, metaData?: any) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType>({} as AuthContextType);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<UserWithRole | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const lastFetchToken = useRef(0);
-
-  const buildFallbackUser = (sessionUser: User): UserWithRole => {
-    const metaName = (sessionUser.user_metadata as any)?.name;
-    const metaRole = (sessionUser.user_metadata as any)?.role;
-
-    return {
-      ...sessionUser,
-      role: (metaRole as 'admin' | 'corretor') || 'corretor',
-      name: metaName || 'Usuário',
-    };
-  };
-
-  const fetchProfile = async (sessionUser: User | null) => {
-    const token = ++lastFetchToken.current;
-
-    if (!sessionUser) {
-      setUser(null);
-      return;
-    }
-
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('name, role')
-        .eq('id', sessionUser.id)
-        .single();
-
-      if (token !== lastFetchToken.current) return;
-
-      if (profile && !error) {
-        setUser({
-          ...sessionUser,
-          role: (profile.role as 'admin' | 'corretor') || 'corretor',
-          name: profile.name || (sessionUser.user_metadata as any)?.name || 'Usuário',
-        });
-      } else {
-        setUser(buildFallbackUser(sessionUser));
-      }
-    } catch (err) {
-      if (token !== lastFetchToken.current) return;
-      console.error('Erro ao carregar perfil:', err);
-      setUser(buildFallbackUser(sessionUser));
-    }
-  };
-
-  const refreshProfile = async () => {
-    await fetchProfile(session?.user ?? null);
-  };
-
   useEffect(() => {
-    let isMounted = true;
-
-    // Unificamos a inicialização e a escuta de mudanças em um único lugar
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
-      if (!isMounted) return;
-
-      // Se for um evento de "SIGNED_OUT", limpamos tudo e paramos o loading
-      if (event === 'SIGNED_OUT') {
-        setSession(null);
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
-      setSession(nextSession);
-
-      if (nextSession?.user) {
-        await fetchProfile(nextSession.user);
-      } else {
-        setUser(null);
-      }
-
-      if (isMounted) setLoading(false);
+    // 1. Pega sessão inicial
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(buildUserWithRole(session?.user));
+      setLoading(false);
     });
 
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
+    // 2. Escuta mudanças (login, logout, etc)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(buildUserWithRole(session?.user));
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, pass: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
-    if (error) throw error;
+  // Função para garantir que user tenha name e role
+  const buildUserWithRole = (user: User | null): UserWithRole | null => {
+    if (!user) return null;
+    const name = (user.user_metadata as any)?.name || undefined;
+    const role = (user.user_metadata as any)?.role || undefined;
+    return { ...user, name, role };
   };
 
-  const signUp = async (email: string, pass: string, name: string, phone: string) => {
+  // Função de Login
+  const signIn = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    return { error };
+  };
+
+  // Função de Cadastro
+  const signUp = async (name: string, email: string, password: string, metaData?: any) => {
     const { error } = await supabase.auth.signUp({
       email,
-      password: pass,
+      password,
       options: {
-        data: { name, phone, role: 'corretor' },
+        data: { name, ...metaData }, // Envia nome e role para o banco
       },
     });
-    if (error) throw error;
+    return { error };
   };
 
+  // Função de Logout
   const signOut = async () => {
     await supabase.auth.signOut();
   };
 
-  return (
-    <AuthContext.Provider value={{ session, user, loading, signIn, signUp, signOut, refreshProfile }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const value = {
+    session,
+    user,
+    loading,
+    signIn,
+    signUp,
+    signOut,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+  }
+  return context;
+};

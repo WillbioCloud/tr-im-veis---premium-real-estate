@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
@@ -23,7 +24,6 @@ const AdminLayout: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-slate-900 overflow-hidden font-sans">
-      
       {/* Sidebar Desktop */}
       <aside className="hidden md:flex flex-col w-64 bg-slate-900 text-white shadow-xl relative z-20">
         <div className="p-6 border-b border-slate-800">
