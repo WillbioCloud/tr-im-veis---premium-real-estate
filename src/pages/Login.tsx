@@ -35,10 +35,10 @@ const Login: React.FC = () => {
         if (!name) throw new Error('Por favor, informe seu nome.');
         
         // Envia o nome nos metadados para criar o Perfil automaticamente (via Trigger do Banco)
-        const { error: signUpError } = await signUp(email, password, { 
+        const { error: signUpError } = await signUp(email, password, JSON.stringify({ 
           name: name,
           role: 'corretor' // Default
-        });
+        }));
 
         if (signUpError) throw signUpError;
 
