@@ -28,9 +28,24 @@ const AdminLayout: React.FC = () => {
       {/* Sidebar Desktop */}
       <aside className="hidden md:flex flex-col w-64 bg-slate-900 text-white shadow-xl relative z-20">
         <div className="p-6 border-b border-slate-800">
-          <h1 className="text-2xl font-serif font-bold tracking-wide text-brand-400">TR Imóveis</h1>
-          <p className="text-xs text-slate-500 uppercase tracking-widest mt-1">Gestão Premium</p>
-        </div>
+  <div className="flex items-center gap-2">
+    <h1 className="text-2xl font-serif font-bold tracking-wide text-brand-400">
+      TR Imóveis
+    </h1>
+
+    <button
+      className="text-slate-400 hover:text-brand-400 transition-colors flex items-center justify-between"
+      onClick={() => window.open('/', '_blank')}
+      aria-label="Abrir site"
+    >
+      <Icons.Globe size={20} />
+    </button>
+  </div>
+
+  <p className="text-xs text-slate-500 uppercase tracking-widest mt-1">
+    Gestão Premium
+  </p>
+</div>
 
         <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto custom-scrollbar">
           {menuItems.map(item => (

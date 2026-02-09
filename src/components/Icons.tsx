@@ -53,6 +53,7 @@ import {
   House,
   Send,
   List,
+  Globe,
 } from 'lucide-react';
 
 export const Icons = {
@@ -113,4 +114,5 @@ export const Icons = {
   LayoutDashboard,
   Send,
   List,
+  Globe,
 };
