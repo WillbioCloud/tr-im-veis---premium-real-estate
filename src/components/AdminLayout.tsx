@@ -49,7 +49,6 @@ const AdminLayout: React.FC = () => {
           ))}
         </nav>
 
-        {/* === PERFIL DO USUÁRIO (RODAPÉ) === */}
         <div className="p-4 border-t border-slate-800 bg-slate-900/50">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full bg-brand-500 flex items-center justify-center text-white font-bold text-lg shadow-md border-2 border-slate-700 shrink-0">
