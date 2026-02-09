@@ -53,11 +53,11 @@ const AdminLayout: React.FC = () => {
         <div className="p-4 border-t border-slate-800 bg-slate-900/50">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full bg-brand-500 flex items-center justify-center text-white font-bold text-lg shadow-md border-2 border-slate-700 shrink-0">
-              {user?.name?.charAt(0) || 'U'}
+              {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white truncate">
-                {user?.name || 'Usuário'}
+                {user?.displayName || user?.email || 'Usuário'}
               </p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <div className={`w-1.5 h-1.5 rounded-full ${user?.role === 'admin' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
@@ -110,10 +110,10 @@ const AdminLayout: React.FC = () => {
             <div className="pt-4 border-t border-slate-100 mt-2">
               <div className="flex items-center gap-3 px-4 py-2">
                 <div className="w-9 h-9 rounded-full bg-brand-500 flex items-center justify-center text-white font-bold">
-                  {user?.name?.charAt(0)}
+                  {user?.displayName?.charAt(0) || user?.email?.charAt(0)}
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-slate-700">{user?.name}</p>
+                  <p className="text-sm font-bold text-slate-700">{user?.displayName || user?.email}</p>
                   <p className="text-xs text-slate-500 capitalize">{user?.role}</p>
                 </div>
               </div>

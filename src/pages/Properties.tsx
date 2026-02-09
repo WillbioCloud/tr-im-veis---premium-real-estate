@@ -10,73 +10,69 @@ const Properties: React.FC = () => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filtros Locais
   const currentCity = searchParams.get('city') || '';
   const currentType = searchParams.get('type') || '';
 
   useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+
     async function fetchProperties() {
       setLoading(true);
       
       try {
-        // === CORREÇÃO DA QUERY ===
-        // Removemos o 'agent:' e buscamos 'profiles' puro para evitar o Erro 400
         let query = supabase
           .from('properties')
-          .select('*, profiles(name, phone, email)'); 
+          .select('*, profiles(name, phone, email)')
+          .abortSignal(controller.signal);
 
-        if (currentCity) {
-          query = query.ilike('city', `%${currentCity}%`);
-        }
-        
-        if (currentType) {
-          query = query.eq('type', currentType);
-        }
+        if (currentCity) query = query.ilike('city', `%${currentCity}%`);
+        if (currentType) query = query.eq('type', currentType);
 
         const { data, error } = await query;
 
-        if (error) {
-          console.error("Erro Supabase:", error);
-          throw error;
-        }
+        if (!isMounted) return;
+
+        if (error) throw error;
 
         if (data) {
-          // === MAPEAMENTO ROBUSTO ===
           const mappedData: Property[] = data.map((item: any) => ({
             ...item,
-            // 1. Garante que 'location' exista para o PropertyCard não quebrar
             location: {
               city: item.city || '',
               neighborhood: item.neighborhood || '',
               state: item.state || '',
               address: item.address || ''
             },
-            // 2. Transforma 'profiles' (do banco) em 'agent' (do front-end)
-            // O Supabase pode retornar 'profiles' como objeto ou array, tratamos os dois.
             agent: Array.isArray(item.profiles) ? item.profiles[0] : item.profiles,
-            
             features: item.features || [],
             images: item.images || []
           }));
           
           setProperties(mappedData);
         }
-      } catch (err) {
-        console.error("Falha ao buscar imóveis:", err);
+      } catch (err: any) {
+        // Verificação corrigida para ignorar o erro no console
+        const isAbort = err.name === 'AbortError' || err.message?.includes('AbortError');
+        if (isMounted && !isAbort) {
+           console.error("Erro na busca de imóveis:", err);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
 
     fetchProperties();
+
+    return () => { 
+      isMounted = false; 
+      controller.abort();
+    };
   }, [currentCity, currentType]);
 
   const handleFilterChange = (key: string, value: string) => {
-    if (value) {
-      searchParams.set(key, value);
-    } else {
-      searchParams.delete(key);
-    }
+    if (value) searchParams.set(key, value);
+    else searchParams.delete(key);
     setSearchParams(searchParams);
   };
 
@@ -132,10 +128,7 @@ const Properties: React.FC = () => {
             <Icons.Search className="mx-auto text-gray-300 mb-4" size={48} />
             <h3 className="text-xl font-bold text-gray-700">Nenhum imóvel encontrado</h3>
             <p className="text-gray-500">Tente ajustar os filtros ou verificar a conexão.</p>
-            <button 
-              onClick={() => setSearchParams({})}
-              className="mt-4 text-brand-600 font-bold hover:underline"
-            >
+            <button onClick={() => setSearchParams({})} className="mt-4 text-brand-600 font-bold hover:underline">
               Limpar Filtros
             </button>
           </div>
