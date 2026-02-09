@@ -5,6 +5,7 @@ import { Icons } from '../components/Icons';
 import LeadDetailsSidebar from '../components/LeadDetailsSidebar';
 import { useAuth } from '../contexts/AuthContext';
 import { TOOLTIPS } from '../constants/tooltips';
+import Loading from '../components/Loading';
 import {
   DndContext,
   useDraggable,
@@ -123,29 +124,26 @@ const LeadCard = ({
       </div>
 
       {/* Badges de Origem */}
-      {isAdmin && (
-        <div className="mb-3 flex flex-wrap gap-1">
-          {(lead as any).property?.agent ? (
-            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded border border-indigo-100 flex items-center w-fit gap-1 font-semibold">
-              <Icons.User size={10} /> {(lead as any).property.agent.name.split(' ')[0]}
-            </span>
-          ) : (
-            <span className="text-[10px] bg-brand-50 text-brand-700 px-2 py-1 rounded border border-brand-100 flex items-center w-fit gap-1 font-semibold">
-              <Icons.Shield size={10} /> Imobiliária
-            </span>
-          )}
+      <div className="mb-3 flex flex-wrap gap-1">
+        {(lead as any).property?.agent ? (
+          <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded border border-indigo-100 flex items-center w-fit gap-1 font-semibold">
+            <Icons.User size={10} /> {(lead as any).property.agent.name.split(' ')[0]}
+          </span>
+        ) : (
+          <span className="text-[10px] bg-brand-50 text-brand-700 px-2 py-1 rounded border border-brand-100 flex items-center w-fit gap-1 font-semibold">
+            <Icons.Shield size={10} /> Imobiliária
+          </span>
+        )}
 
-          {/* Badge de Histórico (Novo) */}
-          {metadata?.visited_properties && metadata.visited_properties.length > 1 && (
-            <span
-              className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200 flex items-center w-fit gap-1 font-semibold"
-              title="Visitou múltiplos imóveis"
-            >
-              <Icons.MapPin size={10} /> +{metadata.visited_properties.length - 1} vistos
-            </span>
-          )}
-        </div>
-      )}
+        {metadata?.visited_properties && metadata.visited_properties.length > 1 && (
+          <span
+            className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200 flex items-center w-fit gap-1 font-semibold"
+            title="Visitou múltiplos imóveis"
+          >
+            <Icons.MapPin size={10} /> +{metadata.visited_properties.length - 1} vistos
+          </span>
+        )}
+      </div>
 
       {/* Mensagem Curta */}
       {(lead as any).message && (
@@ -204,37 +202,46 @@ const AdminLeads: React.FC = () => {
   const isAdmin = (user as any)?.role === 'admin';
 
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null); // ID do card sendo arrastado
+  const [loading, setLoading] = useState(true);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
-  // Sensores (Mouse e Touch)
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
   );
 
   const fetchLeads = async () => {
-    // O Supabase vai aplicar as regras de segurança automaticamente aqui
-    const { data } = await supabase
-      .from('leads')
-      .select(`
-        *,
-        property:properties (
-          title,
-          agent_id,
-          agent:profiles (name)
-        )
-      `)
-      .order('created_at', { ascending: false });
-    
-    if (data) setLeads(data as any);
+    try {
+      setLoading(true);
+      // RLS (Security Policies) filters the data automatically on the server
+      const { data, error } = await supabase
+        .from('leads')
+        .select(`
+          *,
+          property:properties (
+            title,
+            agent_id,
+            agent:profiles (name)
+          )
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      if (data) setLeads(data as any);
+    } catch (error) {
+      console.error('Erro ao buscar leads:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    fetchLeads();
-  }, []);
+    if (user) {
+      fetchLeads();
+    }
+  }, [user]);
 
-  // Eventos de Drag & Drop
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
   };
@@ -250,39 +257,45 @@ const AdminLeads: React.FC = () => {
     const lead = leads.find((l) => l.id === leadId);
 
     if (lead && lead.status !== newStatus) {
-      // Atualização Otimista (Visual instantâneo)
       setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l)));
-
-      // Atualização no Banco
       await supabase.from('leads').update({ status: newStatus }).eq('id', leadId);
     }
   };
 
   const activeLead = useMemo(() => (activeId ? leads.find((l) => l.id === activeId) : null), [activeId, leads]);
 
+  if (loading) return <Loading />;
+
   return (
     <div className="h-[calc(100vh-2rem)] flex flex-col animate-fade-in">
-      {/* Header */}
       <div className="mb-6 flex justify-between items-center shrink-0">
-        <div>
-          <h1 className="text-2xl font-serif font-bold text-slate-800 flex items-center gap-2">
-            Gestão de Leads <Icons.Info size={16} className="text-slate-400" />
-          </h1>
-          <p className="text-sm text-slate-500">Arraste os cards para atualizar o status.</p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-serif font-bold text-slate-800 flex items-center gap-2">
+              Gestão de Leads <Icons.Info size={16} className="text-slate-400" />
+            </h1>
+            <p className="text-sm text-slate-500">Arraste os cards para atualizar o status.</p>
+          </div>
+          
+          <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase border ${
+            isAdmin 
+              ? 'bg-purple-50 text-purple-700 border-purple-200' 
+              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+          }`}>
+            {isAdmin ? 'Visão Admin (Total)' : 'Meus Leads'}
+          </span>
         </div>
 
-        {/* Botão de Auto Distribuição (Admin) - Mantido igual */}
         {isAdmin && (
           <div className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm">
             <span className="text-xs font-bold text-slate-600">Auto Distribuição</span>
-            <div className="w-8 h-4 bg-brand-600 rounded-full relative cursor-pointer" title={(TOOLTIPS as any)?.autoAssign}>
+            <div className="w-8 h-4 bg-brand-600 rounded-full relative cursor-pointer">
               <div className="absolute right-0.5 top-0.5 w-3 h-3 bg-white rounded-full shadow-sm"></div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Kanban Board */}
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4">
           <div className="flex h-full gap-6 min-w-max px-1">
@@ -308,13 +321,11 @@ const AdminLeads: React.FC = () => {
           </div>
         </div>
 
-        {/* O Segredo da Animação Lisa: DragOverlay */}
         <DragOverlay dropAnimation={dropAnimation}>
           {activeLead ? <LeadCard lead={activeLead} isAdmin={isAdmin} isOverlay /> : null}
         </DragOverlay>
       </DndContext>
 
-      {/* Sidebar de Detalhes */}
       {selectedLead && (
         <LeadDetailsSidebar
           lead={selectedLead}
@@ -322,7 +333,6 @@ const AdminLeads: React.FC = () => {
           onStatusChange={async (status) => {
             setLeads((prev) => prev.map((l) => (l.id === selectedLead.id ? { ...l, status } : l)));
             await supabase.from('leads').update({ status }).eq('id', selectedLead.id);
-            // Atualiza o lead selecionado também para refletir a mudança na sidebar
             setSelectedLead({ ...(selectedLead as any), status } as any);
           }}
         />
