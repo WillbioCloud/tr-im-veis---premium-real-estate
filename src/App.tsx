@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import { ThemeProvider } from './contexts/ThemeContext'; // <--- Importante para Dark Mode
+import { ThemeProvider } from './contexts/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AnimatePresence } from 'framer-motion';
 
@@ -20,8 +20,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminProperties from './pages/AdminProperties';
 import AdminPropertyForm from './pages/AdminPropertyForm';
 import AdminLeads from './pages/AdminLeads';
-import AdminTasks from './pages/AdminTasks';   // <--- Nova página de Agenda
-import AdminConfig from './pages/AdminConfig'; // <--- Nova página de Configurações
+import AdminTasks from './pages/AdminTasks';
+import AdminConfig from './pages/AdminConfig';
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -39,30 +39,17 @@ const PageWrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 const App: React.FC = () => {
-  const location = useLocation();
-
   return (
     <AuthProvider>
-      <ThemeProvider> {/* <--- Envolvendo a aplicação com o Tema */}
+      <ThemeProvider>
         <ScrollToTop />
-        
-        {/* AnimatePresence gerencia as transições de saída */}
         <AnimatePresence mode="wait">
-          <Routes location={location} key={location.pathname}>
-            
+          <Routes>
             {/* === ROTAS PÚBLICAS === */}
             <Route path="/" element={<PageWrapper><Home /></PageWrapper>} />
             <Route path="/imoveis" element={<PageWrapper><Properties /></PageWrapper>} />
             <Route path="/imoveis/:slug" element={<PageWrapper><PropertyDetail /></PageWrapper>} />
-            
-            {/* SEO / Landing Pages (Placeholders) */}
-            <Route path="/bairros/:slug" element={<PageWrapper><Properties /></PageWrapper>} />
-            <Route path="/servicos" element={<PageWrapper><div className="p-20 text-center dark:text-white">Serviços</div></PageWrapper>} />
-            <Route path="/sobre" element={<PageWrapper><div className="p-20 text-center dark:text-white">Sobre Nós</div></PageWrapper>} />
-            <Route path="/contato" element={<PageWrapper><div className="p-20 text-center dark:text-white">Contato</div></PageWrapper>} />
-
-            {/* Admin Login */}
-            <Route path="/admin/login" element={
+            <Route path="/login" element={
               <AnimatedPage>
                 <Login />
               </AnimatedPage>
@@ -70,20 +57,27 @@ const App: React.FC = () => {
             
             {/* === ROTAS PROTEGIDAS (ADMIN) === */}
             <Route element={<ProtectedRoute />}>
-              <Route path="/admin" element={<AdminLayout><AdminDashboard /></AdminLayout>} />
-              <Route path="/admin/dashboard" element={<AdminLayout><AdminDashboard /></AdminLayout>} />
-              
-              {/* Gestão de Imóveis */}
-              <Route path="/admin/imoveis" element={<AdminLayout><AdminProperties /></AdminLayout>} />
-              <Route path="/admin/imoveis/novo" element={<AdminLayout><AdminPropertyForm /></AdminLayout>} />
-              <Route path="/admin/imoveis/editar/:id" element={<AdminLayout><AdminPropertyForm /></AdminLayout>} />
-              
-              {/* CRM & Vendas */}
-              <Route path="/admin/leads" element={<AdminLayout><AdminLeads /></AdminLayout>} />
-              <Route path="/admin/tarefas" element={<AdminLayout><AdminTasks /></AdminLayout>} /> {/* <--- Rota da Agenda */}
-              
-              {/* Configurações */}
-              <Route path="/admin/config" element={<AdminLayout><AdminConfig /></AdminLayout>} /> {/* <--- Rota de Config */}
+              {/* O AdminLayout agora envolve todas as rotas abaixo */}
+              <Route element={<AdminLayout />}>
+                
+                {/* Redireciona /admin para o dashboard */}
+                <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+                
+                <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                
+                {/* Gestão de Imóveis */}
+                <Route path="/admin/imoveis" element={<AdminProperties />} />
+                <Route path="/admin/imoveis/novo" element={<AdminPropertyForm />} />
+                <Route path="/admin/imoveis/editar/:id" element={<AdminPropertyForm />} />
+                
+                {/* CRM & Vendas */}
+                <Route path="/admin/leads" element={<AdminLeads />} />
+                <Route path="/admin/tarefas" element={<AdminTasks />} />
+                
+                {/* Configurações */}
+                <Route path="/admin/config" element={<AdminConfig />} />
+                
+              </Route>
             </Route>
 
             {/* Fallback (404) */}
