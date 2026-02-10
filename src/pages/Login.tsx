@@ -69,6 +69,13 @@ const Login: React.FC = () => {
           </div>
           
           <div className="relative z-10">
+            <button
+                  className="text-slate-50 hover:text-brand-400 transition-colors inline items-start justify-normal"
+                  onClick={() => window.open('/', '_blank')}
+                  aria-label="Abrir site"
+                >
+                  <Icons.ArrowLeft size={27} />
+                </button>
             <h1 className="text-4xl font-serif font-bold tracking-wide text-brand-400 mb-2">
               {COMPANY_NAME}
             </h1>
