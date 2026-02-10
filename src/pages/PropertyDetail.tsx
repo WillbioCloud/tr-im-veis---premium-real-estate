@@ -6,64 +6,93 @@ import { Icons } from '../components/Icons';
 import Loading from '../components/Loading';
 import { COMPANY_PHONE, COMPANY_NAME } from '../constants';
 
+type VisitHistoryItem = {
+  title: string;
+  slug: string;
+  visited_at: string;
+};
+
+const SESSION_HISTORY_KEY = 'tr_session_history';
+
+const isAbortError = (error: unknown): boolean => {
+  if (!error) return false;
+  const maybeError = error as { name?: string; message?: string; code?: string | number };
+  const message = maybeError.message ?? '';
+
+  return (
+    maybeError.name === 'AbortError' ||
+    maybeError.code === 20 ||
+    maybeError.code === '20' ||
+    message.includes('AbortError')
+  );
+};
+
+const readSessionHistory = (): VisitHistoryItem[] => {
+  try {
+    const raw = localStorage.getItem(SESSION_HISTORY_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.filter((entry): entry is VisitHistoryItem => {
+      if (!entry || typeof entry !== 'object') return false;
+      const candidate = entry as Partial<VisitHistoryItem>;
+      return (
+        typeof candidate.title === 'string' &&
+        typeof candidate.slug === 'string' &&
+        typeof candidate.visited_at === 'string'
+      );
+    });
+  } catch {
+    return [];
+  }
+};
+
 const PropertyDetail: React.FC = () => {
-  // CORREÇÃO: Agora pegamos o 'slug' da URL, não o 'id'
   const { slug } = useParams();
   const navigate = useNavigate();
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Formulário de Lead
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [sending, setSending] = useState(false);
 
-  // LOGICA DE RASTREAMENTO: Salva no localStorage por onde o usuário passou
   useEffect(() => {
     if (!property) return;
 
-    const historyRaw = localStorage.getItem('tr_session_history');
-    let history: any[] = [];
-    try {
-      history = historyRaw ? JSON.parse(historyRaw) : [];
-    } catch (e) {
-      history = [];
-    }
-
-    const currentVisit = {
+    const history = readSessionHistory();
+    const currentVisit: VisitHistoryItem = {
       title: property.title,
       slug: property.slug,
       visited_at: new Date().toISOString(),
     };
 
-    // Evita duplicados e mantém os últimos 10
-    const updatedHistory = [currentVisit, ...history.filter((h: any) => h?.slug !== property.slug)].slice(0, 10);
-    localStorage.setItem('tr_session_history', JSON.stringify(updatedHistory));
+    const updatedHistory = [currentVisit, ...history.filter((entry) => entry.slug !== property.slug)].slice(0, 10);
+    localStorage.setItem(SESSION_HISTORY_KEY, JSON.stringify(updatedHistory));
   }, [property]);
 
   useEffect(() => {
     let isMounted = true;
 
     const fetchProperty = async () => {
-      // Se não tiver slug, para o loading
       if (!slug) {
-        console.error('Slug não encontrado na URL');
         if (isMounted) setLoading(false);
         return;
       }
 
-      console.log('Buscando imóvel pelo slug:', slug);
-
       try {
-        // TENTATIVA 1: Buscar Imóvel + Corretor usando o SLUG
         const { data, error } = await supabase
           .from('properties')
           .select('*, agent:profiles(name, phone, email)')
-          .eq('slug', slug) // <--- Mudou de 'id' para 'slug'
+          .eq('slug', slug)
           .maybeSingle();
 
         if (error) {
-          console.warn('Erro ao buscar corretor, tentando fallback...', error.message);
+          if (isAbortError(error)) {
+            return;
+          }
           throw error;
         }
 
@@ -71,49 +100,59 @@ const PropertyDetail: React.FC = () => {
           setProperty({
             ...data,
             location: {
-              city: data.city,
-              neighborhood: data.neighborhood,
-              state: data.state,
+              city: data.city ?? '',
+              neighborhood: data.neighborhood ?? '',
+              state: data.state ?? '',
+              address: data.address ?? '',
             },
-            agent: data.agent,
+            features: Array.isArray(data.features) ? data.features : [],
+            images: Array.isArray(data.images) ? data.images : [],
+            agent: data.agent ?? undefined,
           });
-        } else if (!data) {
-          console.warn('Nenhum imóvel encontrado com este slug.');
         }
-      } catch (err) {
-        // TENTATIVA 2 (Plano B): Buscar APENAS o Imóvel pelo SLUG
-        console.log('Executando plano B: Buscar imóvel simples.');
+      } catch (error) {
+        if (isAbortError(error)) {
+          return;
+        }
 
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('properties')
           .select('*')
-          .eq('slug', slug) // <--- Mudou de 'id' para 'slug'
+          .eq('slug', slug)
           .maybeSingle();
+
+        if (fallbackError) {
+          if (isAbortError(fallbackError)) {
+            return;
+          }
+          return;
+        }
 
         if (fallbackData && isMounted) {
           setProperty({
             ...fallbackData,
             location: {
-              city: fallbackData.city,
-              neighborhood: fallbackData.neighborhood,
-              state: fallbackData.state,
+              city: fallbackData.city ?? '',
+              neighborhood: fallbackData.neighborhood ?? '',
+              state: fallbackData.state ?? '',
+              address: fallbackData.address ?? '',
             },
-            agent: null,
+            features: Array.isArray(fallbackData.features) ? fallbackData.features : [],
+            images: Array.isArray(fallbackData.images) ? fallbackData.images : [],
+            agent: undefined,
           });
-        } else {
-          console.error('Falha final ao carregar imóvel:', fallbackError);
         }
       } finally {
         if (isMounted) setLoading(false);
       }
     };
 
-    fetchProperty();
+    void fetchProperty();
 
     return () => {
       isMounted = false;
     };
-  }, [slug]); // Dependência mudou para slug
+  }, [slug]);
 
   const handleContact = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,35 +160,35 @@ const PropertyDetail: React.FC = () => {
     setSending(true);
 
     try {
-      const assignedTo = property.agent_id || null;
       const targetPhone = property.agent?.phone || COMPANY_PHONE;
-      const isAgent = !!property.agent;
+      const isAgent = Boolean(property.agent);
+      const history = readSessionHistory();
 
-      // Recupera histórico de navegação da sessão para salvar no lead
-      const historyRaw = localStorage.getItem('tr_session_history');
-      let history: any[] = [];
-      try {
-        history = historyRaw ? JSON.parse(historyRaw) : [];
-      } catch (e) {
-        history = [];
-      }
-
-      await supabase.from('leads').insert([
+      const { error } = await supabase.from('leads').insert([
         {
           name,
           phone,
           status: LeadStatus.NEW,
           source: 'Site - Página do Imóvel',
           property_id: property.id,
-          assigned_to: assignedTo,
-          // Crucial para o histórico aparecer no CRM
-          metadata: { visited_properties: history },
+          assigned_to: property.agent_id ?? null,
+          metadata: {
+            visited_properties: history,
+            last_property_slug: property.slug,
+          },
           message: `Interesse no imóvel: ${property.title} (Ref: ${property.slug})`,
         },
       ]);
 
+      if (error) {
+        if (!isAbortError(error)) {
+          alert('Erro ao enviar. Tente novamente.');
+        }
+        return;
+      }
+
       const message = `Olá${
-        isAgent && property.agent?.name ? ' ' + property.agent.name.split(' ')[0] : ''
+        isAgent && property.agent?.name ? ` ${property.agent.name.split(' ')[0]}` : ''
       }, meu nome é *${name}*. Vi o imóvel *${property.title}* no site e gostaria de mais informações.`;
       const whatsappUrl = `https://wa.me/${targetPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
 
@@ -159,8 +198,9 @@ const PropertyDetail: React.FC = () => {
 
       alert('Contato enviado com sucesso!');
     } catch (error) {
-      console.error(error);
-      alert('Erro ao enviar. Tente novamente.');
+      if (!isAbortError(error)) {
+        alert('Erro ao enviar. Tente novamente.');
+      }
     } finally {
       setSending(false);
     }
