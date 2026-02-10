@@ -213,9 +213,10 @@ const AdminLeads: React.FC = () => {
 
   const fetchLeads = async () => {
     try {
+      if (!user?.id) return;
       setLoading(true);
-      // RLS (Security Policies) filters the data automatically on the server
-      const { data, error } = await supabase
+
+      let query = supabase
         .from('leads')
         .select(`
           *,
@@ -226,9 +227,15 @@ const AdminLeads: React.FC = () => {
           )
         `)
         .order('created_at', { ascending: false });
-      
+
+      if (!isAdmin) {
+        query = query.eq('assigned_to', user.id);
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
-      if (data) setLeads(data as any);
+      if (data) setLeads(data as Lead[]);
     } catch (error) {
       console.error('Erro ao buscar leads:', error);
     } finally {
@@ -263,6 +270,20 @@ const AdminLeads: React.FC = () => {
   };
 
   const activeLead = useMemo(() => (activeId ? leads.find((l) => l.id === activeId) : null), [activeId, leads]);
+  const selectedLeadHistory = useMemo(() => {
+    const visited = (selectedLead as { metadata?: { visited_properties?: unknown } } | null)?.metadata?.visited_properties;
+    if (!Array.isArray(visited)) return [];
+
+    return visited.filter((item): item is { title: string; slug: string; visited_at: string } => {
+      if (!item || typeof item !== 'object') return false;
+      const candidate = item as { title?: unknown; slug?: unknown; visited_at?: unknown };
+      return (
+        typeof candidate.title === 'string' &&
+        typeof candidate.slug === 'string' &&
+        typeof candidate.visited_at === 'string'
+      );
+    });
+  }, [selectedLead]);
 
   if (loading) return <Loading />;
 
@@ -295,6 +316,28 @@ const AdminLeads: React.FC = () => {
           </div>
         )}
       </div>
+
+      {selectedLead && (
+        <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">
+            Histórico de navegação: {selectedLead.name}
+          </p>
+          {selectedLeadHistory.length > 0 ? (
+            <ul className="space-y-1 text-sm text-slate-600">
+              {selectedLeadHistory.slice(0, 5).map((visit, index) => (
+                <li key={`${visit.slug}-${visit.visited_at}-${index}`} className="flex justify-between gap-2">
+                  <span className="truncate">{visit.title}</span>
+                  <span className="text-xs text-slate-400 whitespace-nowrap">
+                    {new Date(visit.visited_at).toLocaleString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-400 italic">Sem histórico registrado no metadata.</p>
+          )}
+        </div>
+      )}
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4">
