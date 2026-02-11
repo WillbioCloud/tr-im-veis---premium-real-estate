@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
+// Tipo expandido para incluir roles e dados do perfil
 export type UserWithRole = User & {
   name?: string;
   role?: string;
@@ -21,12 +22,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper para verificar erros de cancelamento (AbortError)
 const isAbortError = (error: unknown): boolean => {
   if (!error) return false;
-
   const maybeError = error as { name?: string; message?: string; code?: string | number };
   const message = maybeError.message ?? '';
-
   return (
     maybeError.name === 'AbortError' ||
     maybeError.code === 20 ||
@@ -35,6 +35,7 @@ const isAbortError = (error: unknown): boolean => {
   );
 };
 
+// Cria um usuário de fallback caso o perfil não carregue do banco
 const buildFallbackUser = (supabaseUser: User): UserWithRole => ({
   ...supabaseUser,
   name: (supabaseUser.user_metadata as Record<string, unknown> | undefined)?.name as string | undefined,
@@ -47,8 +48,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<UserWithRole | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Ref para garantir que não atualizaremos estado se o componente desmontar
+  const isMounted = useRef(true);
 
-  const fetchProfileData = async (supabaseUser: User): Promise<UserWithRole> => {
+  // Função centralizada para buscar dados do perfil
+  const fetchProfileData = useCallback(async (supabaseUser: User): Promise<UserWithRole> => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -57,32 +62,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .maybeSingle();
 
       if (error) {
-        if (isAbortError(error)) {
-          return buildFallbackUser(supabaseUser);
+        if (!isAbortError(error)) {
+          console.error('Erro ao buscar perfil:', error);
         }
         return buildFallbackUser(supabaseUser);
       }
 
-      if (!data) {
+      // CORREÇÃO AQUI: Forçamos o tipo para evitar o erro 'never'
+      const profile = data as { name?: string; role?: string; phone?: string; active?: boolean } | null;
+
+      if (!profile) {
         return buildFallbackUser(supabaseUser);
       }
 
       return {
         ...supabaseUser,
-        name: data.name ?? undefined,
-        role: data.role ?? 'corretor',
-        phone: data.phone ?? undefined,
-        active: data.active ?? true,
+        name: profile.name ?? undefined,
+        role: profile.role ?? 'corretor',
+        phone: profile.phone ?? undefined,
+        active: profile.active ?? true,
       };
     } catch (error) {
-      if (isAbortError(error)) {
-        return buildFallbackUser(supabaseUser);
-      }
+      console.error('Erro inesperado ao buscar perfil:', error);
       return buildFallbackUser(supabaseUser);
     }
-  };
+  }, []);
 
-  const applySession = async (nextSession: Session | null) => {
+  // Aplica a sessão e carrega o usuário enriquecido
+  const applySession = useCallback(async (nextSession: Session | null) => {
+    if (!isMounted.current) return;
+    
     setSession(nextSession);
 
     if (!nextSession?.user) {
@@ -90,60 +99,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    // Carrega o perfil do banco
     const fullUser = await fetchProfileData(nextSession.user);
-    setUser(fullUser);
-  };
+    
+    if (isMounted.current) {
+      setUser(fullUser);
+    }
+  }, [fetchProfileData]);
 
+  // Função exposta para recarregar dados manualmente
   const refreshUser = async () => {
-    if (!session?.user) return;
+    if (!session?.user || !isMounted.current) return;
     const updatedUser = await fetchProfileData(session.user);
-    setUser(updatedUser);
+    if (isMounted.current) {
+      setUser(updatedUser);
+    }
   };
 
   useEffect(() => {
-    let isMounted = true;
+    isMounted.current = true;
 
     const initializeAuth = async () => {
-      setLoading(true);
       try {
-        const {
-          data: { session: currentSession },
-        } = await supabase.auth.getSession();
-
-        if (!isMounted) return;
-        await applySession(currentSession);
-      } catch {
-        if (!isMounted) return;
-        setSession(null);
-        setUser(null);
+        // 1. Pega sessão inicial
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        
+        if (isMounted.current) {
+          await applySession(initialSession);
+        }
+      } catch (error) {
+        console.error('Erro na inicialização da auth:', error);
       } finally {
-        if (isMounted) {
+        if (isMounted.current) {
           setLoading(false);
         }
       }
     };
 
-    void initializeAuth();
+    // Inicia processo
+    initializeAuth();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
-      if (!isMounted) return;
-      setLoading(true);
-      try {
-        await applySession(nextSession);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
+    // 2. Escuta mudanças (Login, Logout, Token Refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+      if (isMounted.current) {
+        if (_event === 'SIGNED_OUT') {
+           setSession(null);
+           setUser(null);
+           setLoading(false);
+        } else {
+           await applySession(nextSession);
+           setLoading(false);
         }
       }
     });
 
     return () => {
-      isMounted = false;
+      isMounted.current = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [applySession]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -158,7 +172,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         data: { name, ...metaData },
       },
     });
-
     return { error };
   };
 

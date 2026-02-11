@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Property } from '../types';
 
@@ -14,19 +14,6 @@ type RawProperty = Omit<Property, 'location'> & {
     email?: string | null;
     phone?: string | null;
   } | null;
-};
-
-const isAbortError = (error: unknown): boolean => {
-  if (!error) return false;
-  const maybeError = error as { name?: string; message?: string; code?: string | number };
-  const message = maybeError.message ?? '';
-
-  return (
-    maybeError.name === 'AbortError' ||
-    maybeError.code === 20 ||
-    maybeError.code === '20' ||
-    message.includes('AbortError')
-  );
 };
 
 const normalizeProperty = (p: RawProperty): Property => ({
@@ -52,67 +39,74 @@ export function useProperties() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Ref para evitar vazamento de memória do Realtime
+  const channelRef = useRef<any>(null);
 
   useEffect(() => {
     let isMounted = true;
 
     const fetchProperties = async () => {
-      setLoading(true);
-      setError(null);
-
       try {
+        // Tenta buscar com o JOIN (Requer permissão de acesso à tabela profiles)
         const { data, error: joinError } = await supabase
           .from('properties')
-          .select(`
-            *,
-            agent:profiles (name, email, phone)
-          `)
+          .select(`*, agent:profiles (name, email, phone)`)
           .order('created_at', { ascending: false });
 
-        if (!isMounted) return;
+        if (joinError) throw joinError;
 
-        if (joinError) {
-          if (isAbortError(joinError)) {
-            return;
-          }
-
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('properties')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-          if (!isMounted) return;
-
-          if (fallbackError) {
-            if (isAbortError(fallbackError)) {
-              return;
-            }
-            throw fallbackError;
-          }
-
-          const mappedFallback = (fallbackData ?? []).map((property) =>
-            normalizeProperty({ ...(property as RawProperty), agent: null })
-          );
-          setProperties(mappedFallback);
-          return;
+        if (isMounted && data) {
+          const mapped = data.map((p) => normalizeProperty(p as RawProperty));
+          setProperties(mapped);
+          setError(null);
         }
+      } catch (err) {
+        // FALLBACK: Se falhar (ex: usuário deslogado não pode ler 'profiles'), busca simples
+        console.warn('Erro ao buscar com join, tentando busca simples...', err);
+        
+        const { data: simpleData, error: simpleError } = await supabase
+          .from('properties')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-        const mappedProperties = (data ?? []).map((property) => normalizeProperty(property as RawProperty));
-        setProperties(mappedProperties);
-      } catch {
-        if (!isMounted) return;
-        setError('Não foi possível carregar a lista de imóveis no momento.');
-      } finally {
         if (isMounted) {
-          setLoading(false);
+          if (simpleError) {
+            console.error('Erro fatal ao buscar imóveis:', simpleError);
+            setError('Não foi possível carregar os imóveis.');
+          } else if (simpleData) {
+            const mapped = simpleData.map((p) => normalizeProperty({ ...p, agent: null } as RawProperty));
+            setProperties(mapped);
+            setError(null);
+          }
         }
+      } finally {
+        if (isMounted) setLoading(false);
       }
     };
 
-    void fetchProperties();
+    // 1. Busca Inicial
+    fetchProperties();
 
+    // 2. Configuração do REALTIME (Ouvindo mudanças no banco)
+    channelRef.current = supabase
+      .channel('public:properties')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'properties' },
+        () => {
+          // Se houver qualquer mudança (novo, delete, update), recarrega a lista
+          fetchProperties();
+        }
+      )
+      .subscribe();
+
+    // Cleanup
     return () => {
       isMounted = false;
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
     };
   }, []);
 

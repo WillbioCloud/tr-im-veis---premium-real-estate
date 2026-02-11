@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import { ThemeProvider } from './contexts/ThemeContext'; // <--- Importante para Dark Mode
+import { ThemeProvider } from './contexts/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AnimatePresence } from 'framer-motion';
 
@@ -20,8 +20,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminProperties from './pages/AdminProperties';
 import AdminPropertyForm from './pages/AdminPropertyForm';
 import AdminLeads from './pages/AdminLeads';
-import AdminTasks from './pages/AdminTasks';   // <--- Nova página de Agenda
-import AdminConfig from './pages/AdminConfig'; // <--- Nova página de Configurações
+import AdminTasks from './pages/AdminTasks';
+import AdminConfig from './pages/AdminConfig';
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -31,7 +31,7 @@ const ScrollToTop = () => {
   return null;
 };
 
-// Wrapper para animar páginas públicas
+// Wrapper simplificado
 const PageWrapper = ({ children }: { children: React.ReactNode }) => (
   <Layout>
     <AnimatedPage>{children}</AnimatedPage>
@@ -42,11 +42,11 @@ const App: React.FC = () => {
   const location = useLocation();
 
   return (
+    // AuthProvider e ThemeProvider DEVEM ser os pais supremos e NUNCA desmontar
     <AuthProvider>
-      <ThemeProvider> {/* <--- Envolvendo a aplicação com o Tema */}
+      <ThemeProvider>
         <ScrollToTop />
         
-        {/* AnimatePresence gerencia as transições de saída */}
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
             
@@ -55,11 +55,11 @@ const App: React.FC = () => {
             <Route path="/imoveis" element={<PageWrapper><Properties /></PageWrapper>} />
             <Route path="/imoveis/:slug" element={<PageWrapper><PropertyDetail /></PageWrapper>} />
             
-            {/* SEO / Landing Pages (Placeholders) */}
+            {/* SEO / Landing Pages */}
             <Route path="/bairros/:slug" element={<PageWrapper><Properties /></PageWrapper>} />
-            <Route path="/servicos" element={<PageWrapper><div className="p-20 text-center dark:text-white">Serviços</div></PageWrapper>} />
-            <Route path="/sobre" element={<PageWrapper><div className="p-20 text-center dark:text-white">Sobre Nós</div></PageWrapper>} />
-            <Route path="/contato" element={<PageWrapper><div className="p-20 text-center dark:text-white">Contato</div></PageWrapper>} />
+            <Route path="/servicos" element={<PageWrapper><div className="pt-20 text-center dark:text-white">Serviços</div></PageWrapper>} />
+            <Route path="/sobre" element={<PageWrapper><div className="pt-20 text-center dark:text-white">Sobre Nós</div></PageWrapper>} />
+            <Route path="/contato" element={<PageWrapper><div className="pt-20 text-center dark:text-white">Contato</div></PageWrapper>} />
 
             {/* Admin Login */}
             <Route path="/admin/login" element={
@@ -69,6 +69,7 @@ const App: React.FC = () => {
             } />
             
             {/* === ROTAS PROTEGIDAS (ADMIN) === */}
+            {/* Nota: Removi o AnimatedPage daqui para evitar conflito com o Layout do Admin */}
             <Route element={<ProtectedRoute />}>
               <Route element={<AdminLayout />}>
                 <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
@@ -82,7 +83,6 @@ const App: React.FC = () => {
               </Route>
             </Route>
 
-            {/* Fallback (404) */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </AnimatePresence>

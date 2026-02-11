@@ -25,8 +25,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <div className="bg-slate-900 text-white py-2 text-xs md:text-sm">
         <div className="container mx-auto px-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1"><Icons.House size={14} /> Venda seu Imóvel Conosco</span>
-            <Link to="https://wa.me/5564996234208" target="_blank" className="flex items-center gap-1 hover:text-amber-400 transition-colors"><Icons.Phone size={14} /> (64) 99623-4208</Link>
+            <Link to="https://wa.me/5564996234208?text=Gostaria%20de%20anunciar%20meu%20im%C3%B3vel,%20poderia%20me%20passar%20mais%20informa%C3%A7%C3%B5es?" target="_blank" className="flex items-center gap-1 hover:text-amber-400 transition-colors"><Icons.House size={14} />Venda seu Imóvel Conosco</Link>
           </div>
           <div className="hidden md:flex gap-4">
             <Link to="/admin/login" className="hover:text-amber-400 transition-colors">Área do Corretor</Link>

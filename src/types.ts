@@ -1,3 +1,5 @@
+// src/types.ts
+
 export enum PropertyType {
   APARTMENT = 'Apartamento',
   HOUSE = 'Casa',
@@ -78,7 +80,7 @@ export interface Task {
 export interface TimelineEvent {
   id: string;
   created_at: string;
-  type: 'status_change' | 'note' | 'call_log' | 'whatsapp' | 'system'; // <--- Tem que ter 'whatsapp' aqui
+  type: 'status_change' | 'note' | 'call_log' | 'whatsapp' | 'system';
   description: string;
   metadata?: any;
   lead_id: string;
@@ -94,7 +96,8 @@ export interface Lead {
   propertyId?: string;
   createdAt: string;
   source: string;
-  assigned_to?: string; // <--- NOVO: ID do corretor dono
+  assigned_to?: string; // ID do corretor dono do lead
+  
   // JOIN: Dados expandidos do Imóvel e do Dono do Imóvel
   property?: {
     title: string;
@@ -115,7 +118,7 @@ export interface Lead {
   loss_reason?: string;    // Se status for LOST
   last_interaction?: string; // Para SLA
   expected_close_date?: string;
-  score: number; // <--- NOVO CAMPO
+  score: number; // Score calculado
 }
 
 export interface FilterState {
@@ -131,10 +134,21 @@ export interface Profile {
   name: string;
   email: string;
   active: boolean;
+  role?: string;
+  phone?: string;
 }
 
 export interface Template {
   id: string;
   title: string;
   content: string;
+}
+
+export interface Database {
+  properties: Property;
+  leads: Lead;
+  tasks: Task;
+  timeline_events: TimelineEvent;
+  profiles: Profile;
+  templates: Template;
 }
