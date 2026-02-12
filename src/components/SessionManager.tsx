@@ -1,24 +1,28 @@
 // src/components/SessionManager.tsx
 import { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
+const TOKEN_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
+
 export const SessionManager = () => {
-  const { user, signOut } = useAuth();
-  const location = useLocation();
+  const { session } = useAuth();
 
   useEffect(() => {
-    // Verifica se a rota atual NÃO começa com /admin
-    const isPublicRoute = !location.pathname.startsWith('/admin');
+    if (!session) return;
 
-    // Se o usuário estiver logado E estiver em uma rota pública
-    if (user && isPublicRoute) {
-      console.log("Usuário saindo da área administrativa. Encerrando sessão...");
-      
-      // Força o logout para evitar conflitos de RLS/Supabase
-      signOut(); 
-    }
-  }, [location.pathname, user, signOut]);
+    const interval = window.setInterval(async () => {
+      const { error } = await supabase.auth.refreshSession();
 
-  return null; // Esse componente não renderiza nada visualmente
+      if (error) {
+        console.warn('Falha ao renovar token silenciosamente:', error);
+      }
+    }, TOKEN_REFRESH_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [session]);
+
+  return null;
 };

@@ -12,6 +12,13 @@ const formatBRL = (n: number) =>
 
 const getListingType = (listingType?: Property['listing_type']) => listingType || 'sale';
 
+
+const isAbortError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const maybe = error as { name?: string; message?: string };
+  return maybe.name === 'AbortError' || maybe.message?.includes('AbortError') === true;
+};
+
 const InfoTooltip = ({ text }: { text: string }) => (
   <div className="group relative inline-flex items-center ml-2 z-20">
     <Icons.Info size={14} className="text-slate-400 cursor-help hover:text-brand-500 transition-colors" />
@@ -38,7 +45,13 @@ const AdminProperties: React.FC = () => {
   const [importPreview, setImportPreview] = useState<any[]>([]);
 
   const fetchProperties = async () => {
-    setLoading(true);
+    const shouldShowInitialLoading = properties.length === 0;
+    if (shouldShowInitialLoading) {
+      setLoading(true);
+    }
+
+    let aborted = false;
+
     try {
       const { data, error } = await supabase
         .from('properties')
@@ -63,9 +76,16 @@ const AdminProperties: React.FC = () => {
         setProperties(formattedData);
       }
     } catch (error) {
+      if (isAbortError(error)) {
+        aborted = true;
+        return;
+      }
+
       console.error("Erro ao buscar imóveis:", error);
     } finally {
-      setLoading(false);
+      if (!aborted && shouldShowInitialLoading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -222,7 +242,7 @@ const AdminProperties: React.FC = () => {
       </div>
 
       {/* Tabela de Imóveis */}
-      {loading ? (
+      {loading && properties.length === 0 ? (
         <div className="text-center py-20"><Icons.Loader2 className="animate-spin mx-auto text-brand-600" size={40} /></div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">

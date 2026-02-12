@@ -15,6 +15,13 @@ const getLevelTitle = (xp: number) => {
   return 'Corretor Júnior';
 };
 
+
+const isAbortError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const maybe = error as { name?: string; message?: string };
+  return maybe.name === 'AbortError' || maybe.message?.includes('AbortError') === true;
+};
+
 const getLevelProgress = (xp: number) => {
   const checkpoints = [0, 1200, 2500, 4000, 6000];
   const currentLevel = checkpoints.findLastIndex((point) => xp >= point);
@@ -58,9 +65,14 @@ const AdminDashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     if (!user?.id) return;
 
-    try {
+    const shouldShowInitialLoading = hotLeads.length === 0 && agenda.length === 0 && agentsPerformance.length === 0;
+    if (shouldShowInitialLoading) {
       setLoading(true);
+    }
 
+    let aborted = false;
+
+    try {
       if (isAdmin) {
         const [propertiesRes, leadsRes, activeDealsRes, hotLeadsRes, agentsRes] = await Promise.all([
           supabase.from('properties').select('id, price, listing_type, agent_id'),
@@ -147,9 +159,16 @@ const AdminDashboard: React.FC = () => {
         setAgenda(tasksRes.data || []);
       }
     } catch (error) {
+      if (isAbortError(error)) {
+        aborted = true;
+        return;
+      }
+
       console.error('Erro ao carregar dashboard:', error);
     } finally {
-      setLoading(false);
+      if (!aborted && shouldShowInitialLoading) {
+        setLoading(false);
+      }
     }
   };
 
