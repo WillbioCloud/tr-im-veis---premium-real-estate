@@ -13,19 +13,17 @@ export default {
       },
 
       colors: {
-        // ✅ Sua paleta atual (mantida)
         brand: {
-          50: '#fbf7f0',  // Off-white creme
-          100: '#f5efe0',
-          200: '#eadbc0',
-          300: '#dec29a',
-          400: '#d2a36b',
-          500: '#c68a44', // Dourado Bronze (Base)
-          600: '#ac7036',
-          700: '#8e562e',
-          800: '#75452b',
-          900: '#613a26',
-          950: '#361e12',
+          50: '#fbf8eb',
+          100: '#f5eccb',
+          200: '#edd697',
+          300: '#e4bd5b',
+          400: '#dda033',
+          500: '#d4af37',
+          600: '#aa8c2c',
+          700: '#886b25',
+          800: '#705624',
+          900: '#5e4822',
         },
 
         // ✅ Seu dark theme atual (mantido)

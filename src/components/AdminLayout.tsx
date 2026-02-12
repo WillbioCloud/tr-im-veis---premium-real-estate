@@ -2,11 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 const TWO_MINUTES = 2 * 60 * 1000;
 
 const AdminLayout: React.FC = () => {
   const { user, signOut } = useAuth();
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -45,6 +47,21 @@ const AdminLayout: React.FC = () => {
       window.removeEventListener('focus', onFocus);
     };
   }, []);
+
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+
+    return () => {
+      root.classList.remove('dark');
+    };
+  }, [theme]);
 
   const handleLogout = async () => {
     await signOut();
