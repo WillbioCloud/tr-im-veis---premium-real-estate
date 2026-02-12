@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import PropertyCard from '../components/PropertyCard';
@@ -11,6 +11,7 @@ const Properties: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const currentCity = searchParams.get('city') || '';
+  const currentNeighborhood = searchParams.get('neighborhood') || '';
   const currentType = searchParams.get('type') || '';
 
   useEffect(() => {
@@ -27,6 +28,7 @@ const Properties: React.FC = () => {
           .abortSignal(controller.signal);
 
         if (currentCity) query = query.ilike('city', `%${currentCity}%`);
+        if (currentNeighborhood) query = query.ilike('neighborhood', `%${currentNeighborhood}%`);
         if (currentType) query = query.eq('type', currentType);
 
         const { data, error } = await query;
@@ -52,10 +54,9 @@ const Properties: React.FC = () => {
           setProperties(mappedData);
         }
       } catch (err: any) {
-        // Verificação corrigida para ignorar o erro no console
         const isAbort = err.name === 'AbortError' || err.message?.includes('AbortError');
         if (isMounted && !isAbort) {
-           console.error("Erro na busca de imóveis:", err);
+          console.error('Erro na busca de imóveis:', err);
         }
       } finally {
         if (isMounted) setLoading(false);
@@ -68,46 +69,90 @@ const Properties: React.FC = () => {
       isMounted = false; 
       controller.abort();
     };
-  }, [currentCity, currentType]);
+  }, [currentCity, currentNeighborhood, currentType]);
+
+  const cities = useMemo(
+    () => Array.from(new Set(properties.map((property) => property.location.city).filter(Boolean))).sort(),
+    [properties]
+  );
+
+  const neighborhoods = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          properties
+            .filter((property) => !currentCity || property.location.city === currentCity)
+            .map((property) => property.location.neighborhood)
+            .filter(Boolean)
+        )
+      ).sort(),
+    [properties, currentCity]
+  );
 
   const handleFilterChange = (key: string, value: string) => {
-    if (value) searchParams.set(key, value);
-    else searchParams.delete(key);
-    setSearchParams(searchParams);
+    const nextParams = new URLSearchParams(searchParams);
+    if (value) nextParams.set(key, value);
+    else nextParams.delete(key);
+
+    if (key === 'city') nextParams.delete('neighborhood');
+
+    setSearchParams(nextParams);
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen py-20 animate-fade-in">
+    <div className="bg-gray-50 min-h-screen py-12 md:py-20 animate-fade-in">
       <div className="container mx-auto px-4">
         
-        <div className="flex flex-col md:flex-row justify-between items-center mb-12 gap-6">
+        <div className="flex flex-col md:flex-row justify-between md:items-end mb-10 md:mb-12 gap-6">
           <div>
-            <h1 className="text-4xl font-serif font-bold text-slate-800 mb-2">Imóveis Exclusivos</h1>
-            <p className="text-slate-500">Encontre o lar dos seus sonhos em nossa seleção premium.</p>
+            <h1 className="text-3xl md:text-4xl font-serif font-bold text-slate-800 mb-2">Imóveis Exclusivos</h1>
+            <p className="text-slate-500 text-sm md:text-base">Encontre o lar dos seus sonhos em nossa seleção premium.</p>
           </div>
 
-          <div className="flex gap-4 w-full md:w-auto">
-             <div className="relative flex-1 md:w-64">
-               <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-               <input 
-                 type="text" 
-                 placeholder="Filtrar por cidade..." 
-                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-brand-500 outline-none transition-all shadow-sm"
-                 value={currentCity}
-                 onChange={e => handleFilterChange('city', e.target.value)}
-               />
-             </div>
-             
-             <select 
-               className="pl-4 pr-10 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-brand-500 outline-none bg-white shadow-sm cursor-pointer"
-               value={currentType}
-               onChange={e => handleFilterChange('type', e.target.value)}
-             >
-               <option value="">Todos os Tipos</option>
-               {Object.values(PropertyType).map(t => (
-                 <option key={t} value={t}>{t}</option>
-               ))}
-             </select>
+          <div className="w-full md:w-auto bg-white rounded-3xl md:rounded-full p-3 shadow-md border border-slate-100">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-0 md:divide-x md:divide-slate-100">
+              <div className="px-1 md:px-4">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Cidade</label>
+                <select
+                  className="w-full py-3 md:py-2 text-sm md:text-base rounded-xl md:rounded-none border border-slate-200 md:border-none focus:ring-2 md:focus:ring-0 focus:ring-brand-500 outline-none bg-white cursor-pointer"
+                  value={currentCity}
+                  onChange={e => handleFilterChange('city', e.target.value)}
+                >
+                  <option value="">Todas as cidades</option>
+                  {cities.map((city) => (
+                    <option key={city} value={city}>{city}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="px-1 md:px-4">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Bairro</label>
+                <select
+                  className="w-full py-3 md:py-2 text-sm md:text-base rounded-xl md:rounded-none border border-slate-200 md:border-none focus:ring-2 md:focus:ring-0 focus:ring-brand-500 outline-none bg-white cursor-pointer"
+                  value={currentNeighborhood}
+                  onChange={e => handleFilterChange('neighborhood', e.target.value)}
+                >
+                  <option value="">Todos os bairros</option>
+                  {neighborhoods.map((neighborhood) => (
+                    <option key={neighborhood} value={neighborhood}>{neighborhood}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="px-1 md:px-4">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Tipo</label>
+                <select 
+                  className="w-full py-3 md:py-2 text-sm md:text-base rounded-xl md:rounded-none border border-slate-200 md:border-none focus:ring-2 md:focus:ring-0 focus:ring-brand-500 outline-none bg-white cursor-pointer"
+                  value={currentType}
+                  onChange={e => handleFilterChange('type', e.target.value)}
+                >
+                  <option value="">Todos os Tipos</option>
+                  {Object.values(PropertyType).map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
         </div>
 
