@@ -10,6 +10,8 @@ import { TOOLTIPS } from '../constants/tooltips';
 const formatBRL = (n: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 
+const getListingType = (listingType?: Property['listing_type']) => listingType || 'sale';
+
 const InfoTooltip = ({ text }: { text: string }) => (
   <div className="group relative inline-flex items-center ml-2 z-20">
     <Icons.Info size={14} className="text-slate-400 cursor-help hover:text-brand-500 transition-colors" />
@@ -28,6 +30,7 @@ const AdminProperties: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('Todos');
+  const [listingFilter, setListingFilter] = useState<'all' | 'sale' | 'rent'>('all');
 
   // Estados do Modal de Importação
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -132,8 +135,16 @@ const AdminProperties: React.FC = () => {
     const searchTerm = search.toLowerCase();
     const matchesSearch = title.includes(searchTerm) || neighborhood.includes(searchTerm);
     const matchesType = typeFilter === 'Todos' || p.type === typeFilter;
-    return matchesSearch && matchesType;
+    const propertyListingType = getListingType(p.listing_type);
+    const matchesListingType = listingFilter === 'all' || propertyListingType === listingFilter;
+    return matchesSearch && matchesType && matchesListingType;
   });
+
+  const listingTabs = [
+    { key: 'all', label: 'Todos' },
+    { key: 'sale', label: 'Venda' },
+    { key: 'rent', label: 'Aluguel' }
+  ] as const;
 
   return (
     <div className="space-y-8 animate-fade-in pb-20">
@@ -167,7 +178,24 @@ const AdminProperties: React.FC = () => {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-4">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-4">
+        <div className="flex flex-wrap gap-2">
+          {listingTabs.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setListingFilter(tab.key)}
+              className={`px-4 py-2 rounded-full text-sm font-bold transition-colors border ${
+                listingFilter === tab.key
+                  ? 'bg-brand-600 text-white border-brand-600'
+                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-col md:flex-row gap-4">
         <div className="flex-1 relative">
           <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <input 
@@ -190,6 +218,7 @@ const AdminProperties: React.FC = () => {
           <option value="Comercial">Comercial</option>
           <option value="Cobertura">Cobertura</option>
         </select>
+        </div>
       </div>
 
       {/* Tabela de Imóveis */}
@@ -221,7 +250,14 @@ const AdminProperties: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredProperties.map(property => (
+                  filteredProperties.map(property => {
+                    const listingType = getListingType(property.listing_type);
+                    const isRent = listingType === 'rent';
+                    const displayedPrice = isRent
+                      ? `${formatBRL(Number(property.rent_package_price || property.price || 0))}/mês`
+                      : formatBRL(Number(property.price || 0));
+
+                    return (
                     <tr key={property.id} className="hover:bg-slate-50 transition-colors group">
                       <td className="p-4">
                         <div className="flex items-center gap-3">
@@ -233,7 +269,16 @@ const AdminProperties: React.FC = () => {
                             )}
                           </div>
                           <div>
-                            <p className="font-bold text-slate-800 line-clamp-1 max-w-[180px]" title={property.title}>{property.title}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-slate-800 line-clamp-1 max-w-[180px]" title={property.title}>{property.title}</p>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase border ${
+                                isRent
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              }`}>
+                                {isRent ? 'Aluguel' : 'Venda'}
+                              </span>
+                            </div>
                             <span className="text-[9px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-bold uppercase border border-slate-200">
                               {property.type}
                             </span>
@@ -242,7 +287,7 @@ const AdminProperties: React.FC = () => {
                       </td>
                       
                       <td className="p-4 font-bold text-slate-700">
-                        {formatBRL(property.price)}
+                        {displayedPrice}
                       </td>
 
                       <td className="p-4 text-slate-600">
@@ -293,7 +338,8 @@ const AdminProperties: React.FC = () => {
                         </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
