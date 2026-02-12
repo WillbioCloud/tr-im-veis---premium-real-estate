@@ -66,6 +66,7 @@ import {
   ChevronDown,
   Bookmark,
   MoreHorizontal,
+  MessageSquare,
 } from 'lucide-react';
 
 export const Icons = {
@@ -139,4 +140,5 @@ export const Icons = {
   ChevronDown,
   Bookmark,
   MoreHorizontal,
+  MessageSquare,
 };

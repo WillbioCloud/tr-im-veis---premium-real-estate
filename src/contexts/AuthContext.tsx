@@ -2,12 +2,28 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
-// Tipo expandido para incluir roles e dados do perfil
+type ProfileData = {
+  id?: string;
+  role?: string;
+  name?: string;
+  avatar_url?: string;
+  level?: number;
+  xp?: number;
+  phone?: string;
+  active?: boolean;
+  email?: string;
+  [key: string]: unknown;
+};
+
 export type UserWithRole = User & {
   name?: string;
   role?: string;
+  avatar_url?: string;
+  level?: number;
+  xp?: number;
   phone?: string;
   active?: boolean;
+  profile?: ProfileData | null;
 };
 
 interface AuthContextType {
@@ -35,14 +51,50 @@ const isAbortError = (error: unknown): boolean => {
   );
 };
 
-// Cria um usuário de fallback caso o perfil não carregue do banco
-const buildFallbackUser = (supabaseUser: User): UserWithRole => ({
-  ...supabaseUser,
-  name: (supabaseUser.user_metadata as Record<string, unknown> | undefined)?.name as string | undefined,
-  role: ((supabaseUser.user_metadata as Record<string, unknown> | undefined)?.role as string | undefined) ?? 'corretor',
-  phone: (supabaseUser.user_metadata as Record<string, unknown> | undefined)?.phone as string | undefined,
-  active: true,
-});
+const toNumber = (value: unknown, fallback = 0): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const buildFallbackUser = (supabaseUser: User): UserWithRole => {
+  const metadata = (supabaseUser.user_metadata as Record<string, unknown> | undefined) ?? {};
+  return {
+    ...supabaseUser,
+    name: (metadata.name as string | undefined) ?? undefined,
+    role: (metadata.role as string | undefined) ?? 'corretor',
+    avatar_url: (metadata.avatar_url as string | undefined) ?? undefined,
+    level: toNumber(metadata.level, 1),
+    xp: toNumber(metadata.xp, 0),
+    phone: (metadata.phone as string | undefined) ?? undefined,
+    active: true,
+    profile: null,
+  };
+};
+
+const mergeUserWithProfile = (supabaseUser: User, profile: ProfileData | null): UserWithRole => {
+  if (!profile) {
+    return buildFallbackUser(supabaseUser);
+  }
+
+  return {
+    ...supabaseUser,
+    ...profile,
+    id: supabaseUser.id,
+    email: supabaseUser.email,
+    user_metadata: supabaseUser.user_metadata,
+    app_metadata: supabaseUser.app_metadata,
+    aud: supabaseUser.aud,
+    created_at: supabaseUser.created_at,
+    role: (profile.role as string | undefined) ?? 'corretor',
+    name: (profile.name as string | undefined) ?? undefined,
+    avatar_url: (profile.avatar_url as string | undefined) ?? undefined,
+    level: toNumber(profile.level, 1),
+    xp: toNumber(profile.xp, 0),
+    phone: (profile.phone as string | undefined) ?? undefined,
+    active: profile.active ?? true,
+    profile,
+  };
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -57,7 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('name, role, phone, active')
+        .select('*')
         .eq('id', supabaseUser.id)
         .maybeSingle();
 
@@ -68,22 +120,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return buildFallbackUser(supabaseUser);
       }
 
-      // CORREÇÃO AQUI: Forçamos o tipo para evitar o erro 'never'
-      const profile = data as { name?: string; role?: string; phone?: string; active?: boolean } | null;
-
-      if (!profile) {
-        return buildFallbackUser(supabaseUser);
-      }
-
-      return {
-        ...supabaseUser,
-        name: profile.name ?? undefined,
-        role: profile.role ?? 'corretor',
-        phone: profile.phone ?? undefined,
-        active: profile.active ?? true,
-      };
+      const profile = (data as ProfileData | null) ?? null;
+      return mergeUserWithProfile(supabaseUser, profile);
     } catch (error) {
-      console.error('Erro inesperado ao buscar perfil:', error);
+      if (!isAbortError(error)) {
+        console.error('Erro inesperado ao buscar perfil:', error);
+      }
       return buildFallbackUser(supabaseUser);
     }
   }, []);
