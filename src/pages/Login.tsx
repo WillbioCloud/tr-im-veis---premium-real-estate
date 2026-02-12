@@ -137,11 +137,14 @@ const Login: React.FC = () => {
               {/* Nome (Só aparece no cadastro) */}
               {!isLogin && (
                 <div className="animate-slide-up">
-                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Nome Completo</label>
+                  <label htmlFor="name" className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Nome Completo</label>
                   <div className="relative">
                     <Icons.Users className="absolute left-4 top-3.5 text-slate-400" size={18} />
                     <input 
+                      id="name"
                       type="text" 
+                      name="name"
+                      autoComplete="name"
                       placeholder="Seu nome"
                       className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-500 transition-all"
                       value={name}
@@ -153,11 +156,14 @@ const Login: React.FC = () => {
               )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">E-mail Corporativo</label>
+                <label htmlFor="email" className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">E-mail Corporativo</label>
                 <div className="relative">
                   <Icons.Mail className="absolute left-4 top-3.5 text-slate-400" size={18} />
                   <input 
+                    id="email"
+                    name="email"
                     type="email" 
+                    autoComplete="email"
                     placeholder="voce@imobiliaria.com"
                     className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-500 transition-all"
                     value={email}
@@ -168,11 +174,14 @@ const Login: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Senha</label>
+                <label htmlFor="password" className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Senha</label>
                 <div className="relative">
                   <Icons.Lock className="absolute left-4 top-3.5 text-slate-400" size={18} />
                   <input 
+                    id="password"
+                    name="password"
                     type="password" 
+                    autoComplete="current-password"
                     placeholder="••••••••"
                     className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-brand-500 transition-all"
                     value={password}
@@ -190,6 +199,7 @@ const Login: React.FC = () => {
                       {keepLogged && <Icons.Check size={14} className="text-white" />}
                     </div>
                     <input 
+                      name="keep_logged"
                       type="checkbox" 
                       className="hidden"
                       checked={keepLogged}
