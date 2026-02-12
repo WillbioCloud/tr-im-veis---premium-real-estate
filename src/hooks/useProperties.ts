@@ -56,7 +56,8 @@ export function useProperties() {
 
     const fetchProperties = async () => {
       const shouldShowInitialLoading = !hasLoadedOnceRef.current;
-      if (shouldShowInitialLoading) {
+      // NÃO limpe setProperties([]) aqui. Mantenha os dados velhos na tela.
+      if (shouldShowInitialLoading && properties.length === 0) {
         setLoading(true);
       }
 
