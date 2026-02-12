@@ -38,100 +38,16 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper para verificar erros de cancelamento (AbortError)
-const isAbortError = (error: unknown): boolean => {
-  if (!error) return false;
-  const maybeError = error as { name?: string; message?: string; code?: string | number };
-  const message = maybeError.message ?? '';
-  return (
-    maybeError.name === 'AbortError' ||
-    maybeError.code === 20 ||
-    maybeError.code === '20' ||
-    message.includes('AbortError')
-  );
-};
-
-const toNumber = (value: unknown, fallback = 0): number => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
-
-const buildFallbackUser = (supabaseUser: User): UserWithRole => {
-  const metadata = (supabaseUser.user_metadata as Record<string, unknown> | undefined) ?? {};
-  return {
-    ...supabaseUser,
-    name: (metadata.name as string | undefined) ?? undefined,
-    role: (metadata.role as string | undefined) ?? 'corretor',
-    avatar_url: (metadata.avatar_url as string | undefined) ?? undefined,
-    level: toNumber(metadata.level, 1),
-    xp: toNumber(metadata.xp, 0),
-    phone: (metadata.phone as string | undefined) ?? undefined,
-    active: true,
-    profile: null,
-  };
-};
-
-const mergeUserWithProfile = (supabaseUser: User, profile: ProfileData | null): UserWithRole => {
-  if (!profile) {
-    return buildFallbackUser(supabaseUser);
-  }
-
-  return {
-    ...supabaseUser,
-    ...profile,
-    id: supabaseUser.id,
-    email: supabaseUser.email,
-    user_metadata: supabaseUser.user_metadata,
-    app_metadata: supabaseUser.app_metadata,
-    aud: supabaseUser.aud,
-    created_at: supabaseUser.created_at,
-    role: (profile.role as string | undefined) ?? 'corretor',
-    name: (profile.name as string | undefined) ?? undefined,
-    avatar_url: (profile.avatar_url as string | undefined) ?? undefined,
-    level: toNumber(profile.level, 1),
-    xp: toNumber(profile.xp, 0),
-    phone: (profile.phone as string | undefined) ?? undefined,
-    active: profile.active ?? true,
-    profile,
-  };
-};
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<UserWithRole | null>(null);
   const [loading, setLoading] = useState(true);
-  
-  // Ref para garantir que não atualizaremos estado se o componente desmontar
   const isMounted = useRef(true);
 
-  // Função centralizada para buscar dados do perfil
-  const fetchProfileData = useCallback(async (supabaseUser: User): Promise<UserWithRole> => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', supabaseUser.id)
-        .maybeSingle();
-
-      if (error) {
-        if (!isAbortError(error)) {
-          console.error('Erro ao buscar perfil:', error);
-        }
-        return buildFallbackUser(supabaseUser);
-      }
-
-      const profile = (data as ProfileData | null) ?? null;
-      return mergeUserWithProfile(supabaseUser, profile);
-    } catch (error) {
-      if (!isAbortError(error)) {
-        console.error('Erro inesperado ao buscar perfil:', error);
-      }
-      return buildFallbackUser(supabaseUser);
-    }
-  }, []);
-
-  // 1. Função blindada para aplicar sessão sem quebrar o app
+  // Função centralizada e segura para aplicar sessão
   const applySession = useCallback(async (currentSession: Session | null) => {
+    if (!isMounted.current) return;
+
     if (!currentSession?.user) {
       setSession(null);
       setUser(null);
@@ -141,7 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setSession(currentSession);
 
-      // Tenta buscar o perfil, mas NÃO TRAVA se falhar
+      // Tenta buscar o perfil
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
@@ -152,60 +68,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Perfil não carregado (usando fallback):', error.message);
       }
 
-      // Monta o usuário mesclando dados da sessão + perfil (ou fallback)
+      if (!isMounted.current) return;
+
+      // Cria usuário com dados reais OU fallback se o perfil falhar
       const userWithRole: UserWithRole = {
         ...currentSession.user,
-        role: profile?.role || 'corretor',
+        role: profile?.role || 'corretor', // Fallback importante
         name: profile?.name || currentSession.user.user_metadata?.name || 'Usuário',
         avatar_url: profile?.avatar_url,
         level: profile?.level || 1,
         xp: profile?.xp || 0,
         active: profile?.active ?? true,
+        profile: profile || null,
       };
 
       setUser(userWithRole);
     } catch (err) {
-      console.error('Erro crítico no applySession:', err);
-      // Mesmo com erro crítico, mantemos o usuário logado com dados básicos
-      setUser({ ...currentSession.user, role: 'corretor' } as UserWithRole);
+      console.error('Erro ao processar sessão:', err);
+      // Fallback de emergência para não deslogar
+      if (isMounted.current) {
+        setUser({ ...currentSession.user, role: 'corretor' } as UserWithRole);
+      }
     }
   }, []);
 
-  // Função exposta para recarregar dados manualmente
-  const refreshUser = async () => {
-    if (!session?.user || !isMounted.current) return;
-    const updatedUser = await fetchProfileData(session.user);
-    if (isMounted.current) {
-      setUser(updatedUser);
-    }
-  };
-
-  // 2. useEffect com Listener de Visibilidade e Inicialização
   useEffect(() => {
-    let mounted = true;
+    isMounted.current = true;
 
     const initAuth = async () => {
       try {
-        // Busca sessão inicial
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session && mounted) {
-          await applySession(session);
+        // 1. Busca sessão inicial
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        if (initialSession && isMounted.current) {
+          await applySession(initialSession);
         }
       } catch (error) {
         console.error('Erro na inicialização:', error);
       } finally {
-        if (mounted) setLoading(false);
+        if (isMounted.current) setLoading(false);
       }
     };
 
     initAuth();
 
-    // Listener de eventos do Supabase
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
+    // 2. Escuta mudanças de Auth
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      if (!isMounted.current) return;
 
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        await applySession(session);
+        await applySession(newSession);
       } else if (event === 'SIGNED_OUT') {
         setSession(null);
         setUser(null);
@@ -213,10 +124,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    // 3. NOVO: Listener para quando o usuário troca de aba e volta
+    // 3. NOVO: Escuta quando a aba fica visível novamente (Reconexão)
     const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible') {
-        console.log('Aba visível: Revalidando sessão...');
+      if (document.visibilityState === 'visible' && isMounted.current) {
+        console.log('Aba ativa: Verificando sessão...');
         const { data } = await supabase.auth.getSession();
         if (data.session) {
           await applySession(data.session);
@@ -227,7 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      mounted = false;
+      isMounted.current = false;
       subscription.unsubscribe();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
@@ -253,6 +164,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
   };
 
+  const refreshUser = async () => {
+    const { data } = await supabase.auth.getSession();
+    if (data.session) {
+      await applySession(data.session);
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ session, user, loading, signIn, signUp, signOut, refreshUser }}>
       {children}
@@ -263,7 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
