@@ -215,17 +215,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initializeAuth();
 
     // 2. Escuta mudanças (Login, Logout, Token Refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
-      if (isMounted.current) {
-        if (_event === 'SIGNED_OUT') {
-           setSession(null);
-           setUser(null);
-           setLoading(false);
-        } else {
-           await applySession(nextSession);
-           setLoading(false);
-        }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+      if (!isMounted.current) return;
+
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
+      } else if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') {
+        await applySession(nextSession);
+      } else {
+        console.log('Evento de Auth ignorado:', event);
       }
+
+      setLoading(false);
     });
 
     return () => {
