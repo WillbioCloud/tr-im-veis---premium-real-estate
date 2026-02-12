@@ -1,6 +1,12 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: 'class',
+  safelist: [
+    'bg-brand-500',
+    'text-brand-600',
+    'hover:bg-brand-700',
+    'border-brand-200',
+  ],
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -18,12 +24,13 @@ export default {
           100: '#f5eccb',
           200: '#edd697',
           300: '#e4bd5b',
-          400: '#dda033',
-          500: '#d4af37',
-          600: '#aa8c2c',
+          400: '#dda033', // Dourado Principal
+          500: '#d4af37', // Base
+          600: '#aa8c2c', // Hover
           700: '#886b25',
           800: '#705624',
           900: '#5e4822',
+          950: '#35260e',
         },
 
         // ✅ Seu dark theme atual (mantido)
