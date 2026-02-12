@@ -141,6 +141,15 @@ const AdminLayout: React.FC = () => {
                   <p className="text-xs text-slate-500 capitalize">{user?.role === 'admin' ? 'Administrador' : (user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Corretor')}</p>
                 </div>
               </div>
+              {/* BOTÃO CORRIGIDO AQUI */}
+            <button
+              className="text-slate-400 hover:text-brand-400 transition-colors flex items-center justify-center p-1 rounded-md hover:bg-slate-800"
+              onClick={handleExitToHome}
+              aria-label="Abrir site e Sair"
+              title="Ir para o site (Sair)"
+            >
+              <Icons.Globe size={20} />
+            </button>
               <button 
                 onClick={handleLogout} 
                 className="w-full text-left px-4 py-3 text-red-500 text-sm font-bold flex items-center gap-2"
