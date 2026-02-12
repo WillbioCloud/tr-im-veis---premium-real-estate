@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Icons } from '../components/Icons';
 import { COMPANY_NAME } from '../constants';
@@ -68,14 +68,20 @@ const Login: React.FC = () => {
             <div className="absolute inset-0 bg-gradient-to-b from-slate-900/80 to-brand-900/80 mix-blend-multiply"></div>
           </div>
           
-          <div className="relative z-10">
-            <h1 className="text-4xl font-serif font-bold tracking-wide text-brand-400 mb-2">
+          <div className="mb-8 text-center relative">
+          {/* BOTÃO REMOVIDO DAQUI */}
+
+          {/* Nome da Empresa agora é um Link seguro para a Home */}
+          <Link to="/" className="inline-block hover:opacity-80 transition-opacity">
+            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-blue-500 mb-2 cursor-pointer">
               {COMPANY_NAME}
             </h1>
-            <p className="text-slate-300 font-light tracking-widest text-sm uppercase">
-              Gestão Imobiliária Premium
-            </p>
-          </div>
+          </Link>
+          
+          <p className="text-slate-500 dark:text-slate-400">
+            {isLogin ? 'Bem-vindo de volta! Acesse sua conta.' : 'Crie sua conta para gerenciar imóveis.'}
+          </p>
+        </div>
 
           <div className="relative z-10 space-y-6">
             <div className="space-y-4">
