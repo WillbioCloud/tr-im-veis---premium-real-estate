@@ -1,13 +1,16 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { runWithSessionRecovery, supabase } from '../lib/supabase';
 
-// Tipo expandido para incluir roles e dados do perfil
 export type UserWithRole = User & {
   name?: string;
   role?: string;
   phone?: string;
   active?: boolean;
+  avatar_url?: string;
+  level?: string;
+  xp?: number;
+  next_level_xp?: number;
 };
 
 interface AuthContextType {
@@ -22,7 +25,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper para verificar erros de cancelamento (AbortError)
 const isAbortError = (error: unknown): boolean => {
   if (!error) return false;
   const maybeError = error as { name?: string; message?: string; code?: string | number };
@@ -35,12 +37,15 @@ const isAbortError = (error: unknown): boolean => {
   );
 };
 
-// Cria um usuário de fallback caso o perfil não carregue do banco
 const buildFallbackUser = (supabaseUser: User): UserWithRole => ({
   ...supabaseUser,
   name: (supabaseUser.user_metadata as Record<string, unknown> | undefined)?.name as string | undefined,
   role: ((supabaseUser.user_metadata as Record<string, unknown> | undefined)?.role as string | undefined) ?? 'corretor',
   phone: (supabaseUser.user_metadata as Record<string, unknown> | undefined)?.phone as string | undefined,
+  avatar_url: (supabaseUser.user_metadata as Record<string, unknown> | undefined)?.avatar_url as string | undefined,
+  level: ((supabaseUser.user_metadata as Record<string, unknown> | undefined)?.level as string | undefined) ?? 'Júnior',
+  xp: ((supabaseUser.user_metadata as Record<string, unknown> | undefined)?.xp as number | undefined) ?? 0,
+  next_level_xp: ((supabaseUser.user_metadata as Record<string, unknown> | undefined)?.next_level_xp as number | undefined) ?? 100,
   active: true,
 });
 
@@ -48,18 +53,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<UserWithRole | null>(null);
   const [loading, setLoading] = useState(true);
-  
-  // Ref para garantir que não atualizaremos estado se o componente desmontar
   const isMounted = useRef(true);
 
-  // Função centralizada para buscar dados do perfil
   const fetchProfileData = useCallback(async (supabaseUser: User): Promise<UserWithRole> => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('name, role, phone, active')
-        .eq('id', supabaseUser.id)
-        .maybeSingle();
+      const { data, error } = await runWithSessionRecovery(() =>
+        supabase
+          .from('profiles')
+          .select('name, role, phone, active, avatar_url, level, xp, next_level_xp')
+          .eq('id', supabaseUser.id)
+          .maybeSingle()
+      );
 
       if (error) {
         if (!isAbortError(error)) {
@@ -68,8 +72,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return buildFallbackUser(supabaseUser);
       }
 
-      // CORREÇÃO AQUI: Forçamos o tipo para evitar o erro 'never'
-      const profile = data as { name?: string; role?: string; phone?: string; active?: boolean } | null;
+      const profile = data as {
+        name?: string;
+        role?: string;
+        phone?: string;
+        active?: boolean;
+        avatar_url?: string;
+        level?: string;
+        xp?: number;
+        next_level_xp?: number;
+      } | null;
 
       if (!profile) {
         return buildFallbackUser(supabaseUser);
@@ -81,6 +93,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: profile.role ?? 'corretor',
         phone: profile.phone ?? undefined,
         active: profile.active ?? true,
+        avatar_url: profile.avatar_url ?? undefined,
+        level: profile.level ?? 'Júnior',
+        xp: profile.xp ?? 0,
+        next_level_xp: profile.next_level_xp ?? 100,
       };
     } catch (error) {
       console.error('Erro inesperado ao buscar perfil:', error);
@@ -88,10 +104,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Aplica a sessão e carrega o usuário enriquecido
   const applySession = useCallback(async (nextSession: Session | null) => {
     if (!isMounted.current) return;
-    
+
     setSession(nextSession);
 
     if (!nextSession?.user) {
@@ -99,15 +114,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // Carrega o perfil do banco
     const fullUser = await fetchProfileData(nextSession.user);
-    
+
     if (isMounted.current) {
       setUser(fullUser);
     }
   }, [fetchProfileData]);
 
-  // Função exposta para recarregar dados manualmente
+  const recoverSession = useCallback(async () => {
+    if (!isMounted.current) return;
+
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error('Erro ao verificar sessão:', error);
+      return;
+    }
+
+    if (data.session) {
+      const expiresAt = data.session.expires_at ?? 0;
+      const willExpireSoon = expiresAt * 1000 - Date.now() < 60_000;
+      if (willExpireSoon) {
+        const { data: refreshedData } = await supabase.auth.refreshSession();
+        await applySession(refreshedData.session ?? data.session);
+      } else {
+        await applySession(data.session);
+      }
+      return;
+    }
+
+    await applySession(null);
+  }, [applySession]);
+
   const refreshUser = async () => {
     if (!session?.user || !isMounted.current) return;
     const updatedUser = await fetchProfileData(session.user);
@@ -121,12 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const initializeAuth = async () => {
       try {
-        // 1. Pega sessão inicial
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        
-        if (isMounted.current) {
-          await applySession(initialSession);
-        }
+        await recoverSession();
       } catch (error) {
         console.error('Erro na inicialização da auth:', error);
       } finally {
@@ -136,28 +168,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
-    // Inicia processo
     initializeAuth();
 
-    // 2. Escuta mudanças (Login, Logout, Token Refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
-      if (isMounted.current) {
-        if (_event === 'SIGNED_OUT') {
-           setSession(null);
-           setUser(null);
-           setLoading(false);
-        } else {
-           await applySession(nextSession);
-           setLoading(false);
-        }
+    const onFocusOrVisible = async () => {
+      if (!isMounted.current) return;
+      if (document.visibilityState === 'visible') {
+        await recoverSession();
       }
+    };
+
+    window.addEventListener('focus', onFocusOrVisible);
+    document.addEventListener('visibilitychange', onFocusOrVisible);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+      if (!isMounted.current) return;
+
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') {
+        await applySession(nextSession);
+      } else {
+        await recoverSession();
+      }
+
+      setLoading(false);
     });
 
     return () => {
       isMounted.current = false;
       subscription.unsubscribe();
+      window.removeEventListener('focus', onFocusOrVisible);
+      document.removeEventListener('visibilitychange', onFocusOrVisible);
     };
-  }, [applySession]);
+  }, [applySession, recoverSession]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
