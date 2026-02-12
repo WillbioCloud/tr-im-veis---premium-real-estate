@@ -15,6 +15,12 @@ const AdminLayout: React.FC = () => {
     navigate('/admin/login');
   };
 
+  // NOVA FUNÇÃO: Desloga e vai para o site (Home) na MESMA ABA
+  const handleExitToHome = async () => {
+    await signOut(); // Garante o logout
+    navigate('/');   // Navega na mesma aba
+  };
+
   const menuItems = [
     { label: 'Dashboard', path: '/admin/dashboard', icon: Icons.Dashboard },
     { label: 'Leads (CRM)', path: '/admin/leads', icon: Icons.Users },
@@ -33,13 +39,15 @@ const AdminLayout: React.FC = () => {
       TR Imóveis
     </h1>
 
-    <button
-      className="text-slate-400 hover:text-brand-400 transition-colors flex items-center justify-between"
-      onClick={() => window.open('/', '_blank')}
-      aria-label="Abrir site"
-    >
-      <Icons.Globe size={20} />
-    </button>
+    {/* BOTÃO CORRIGIDO AQUI */}
+            <button
+              className="text-slate-400 hover:text-brand-400 transition-colors flex items-center justify-center p-1 rounded-md hover:bg-slate-800"
+              onClick={handleExitToHome}
+              aria-label="Abrir site e Sair"
+              title="Ir para o site (Sair)"
+            >
+              <Icons.Globe size={20} />
+            </button>
   </div>
 
   <p className="text-xs text-slate-500 uppercase tracking-widest mt-1">

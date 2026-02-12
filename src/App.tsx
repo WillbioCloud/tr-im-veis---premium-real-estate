@@ -1,9 +1,13 @@
+// src/App.tsx
 import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AnimatePresence } from 'framer-motion';
+
+// IMPORTAR O NOVO COMPONENTE
+import { SessionManager } from './components/SessionManager';
 
 import Layout from './components/Layout';
 import AdminLayout from './components/AdminLayout';
@@ -31,7 +35,7 @@ const ScrollToTop = () => {
   return null;
 };
 
-// Wrapper simplificado
+// Wrapper simplificado para páginas públicas
 const PageWrapper = ({ children }: { children: React.ReactNode }) => (
   <Layout>
     <AnimatedPage>{children}</AnimatedPage>
@@ -42,11 +46,14 @@ const App: React.FC = () => {
   const location = useLocation();
 
   return (
-    // AuthProvider e ThemeProvider DEVEM ser os pais supremos e NUNCA desmontar
     <AuthProvider>
       <ThemeProvider>
         <ScrollToTop />
         
+        {/* ADICIONAR O SESSION MANAGER AQUI */}
+        {/* Ele vai rodar silenciosamente monitorando a navegação */}
+        <SessionManager />
+
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
             
@@ -69,7 +76,6 @@ const App: React.FC = () => {
             } />
             
             {/* === ROTAS PROTEGIDAS (ADMIN) === */}
-            {/* Nota: Removi o AnimatedPage daqui para evitar conflito com o Layout do Admin */}
             <Route element={<ProtectedRoute />}>
               <Route element={<AdminLayout />}>
                 <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
