@@ -34,6 +34,8 @@ const AdminDashboard: React.FC = () => {
   const [adminStats, setAdminStats] = useState({
     totalLeads: 0,
     totalProperties: 0,
+    saleProperties: 0,
+    rentProperties: 0,
     totalVgv: 0,
     activeDeals: 0,
   });
@@ -97,8 +99,13 @@ const AdminDashboard: React.FC = () => {
           };
         });
 
+        const saleProperties = properties.filter((property: any) => (property.listing_type || 'sale') === 'sale').length;
+        const rentProperties = properties.filter((property: any) => property.listing_type === 'rent').length;
+
         setAdminStats({
           totalProperties: properties.length,
+          saleProperties,
+          rentProperties,
           totalLeads: leadsRes.count || 0,
           activeDeals: activeDealsRes.count || 0,
           totalVgv,
@@ -168,7 +175,7 @@ const AdminDashboard: React.FC = () => {
 
       {isAdmin ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <p className="text-sm text-slate-500">VGV Total</p>
               <h3 className="text-3xl font-bold text-slate-900 mt-1">{loading ? '...' : formatBRL(adminStats.totalVgv)}</h3>
@@ -178,8 +185,12 @@ const AdminDashboard: React.FC = () => {
               <h3 className="text-3xl font-bold text-slate-900 mt-1">{loading ? '...' : adminStats.totalLeads}</h3>
             </div>
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-              <p className="text-sm text-slate-500">Imóveis Cadastrados</p>
-              <h3 className="text-3xl font-bold text-slate-900 mt-1">{loading ? '...' : adminStats.totalProperties}</h3>
+              <p className="text-sm text-slate-500 flex items-center gap-2"><Icons.Home size={16} className="text-indigo-600" /> Portfólio de Venda</p>
+              <h3 className="text-3xl font-bold text-slate-900 mt-1">{loading ? '...' : adminStats.saleProperties}</h3>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <p className="text-sm text-slate-500 flex items-center gap-2"><Icons.KeyRound size={16} className="text-emerald-600" /> Portfólio de Aluguel</p>
+              <h3 className="text-3xl font-bold text-slate-900 mt-1">{loading ? '...' : adminStats.rentProperties}</h3>
             </div>
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <p className="text-sm text-slate-500">Negócios em Andamento</p>

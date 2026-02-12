@@ -67,6 +67,7 @@ import {
   Bookmark,
   MoreHorizontal,
   MessageSquare,
+  KeyRound,
 } from 'lucide-react';
 
 export const Icons = {
@@ -141,4 +142,5 @@ export const Icons = {
   Bookmark,
   MoreHorizontal,
   MessageSquare,
+  KeyRound,
 };
