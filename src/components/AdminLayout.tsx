@@ -31,13 +31,28 @@ const AdminLayout: React.FC = () => {
         setTimeout(() => reject(new Error('Timeout')), 3000)
       );
 
-      await Promise.race([supabase.auth.refreshSession(), timeoutPromise]);
+      const { data, error } = (await Promise.race([
+        supabase.auth.refreshSession(),
+        timeoutPromise,
+      ])) as Awaited<ReturnType<typeof supabase.auth.refreshSession>>;
 
+      if (error || !data.session) {
+        throw new Error('Sessão inválida');
+      }
+
+      console.log('Sessão renovada!');
       setRefreshKey((prev) => prev + 1);
       setIsMobileMenuOpen(false);
     } catch (error) {
-      console.warn('Recuperação demorou muito. Forçando reload total.', error);
-      window.location.reload();
+      console.warn('Falha crítica na sessão. Efetuando logout forçado e limpo.', error);
+
+      await supabase.auth.signOut({ scope: 'local' });
+
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith('sb-'))
+        .forEach((key) => localStorage.removeItem(key));
+
+      window.location.href = '/admin/login';
     } finally {
       setIsRefreshing(false);
     }

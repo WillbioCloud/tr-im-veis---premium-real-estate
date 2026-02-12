@@ -175,15 +175,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
 
-        if (error && !isAbortError(error)) {
-          console.error('Erro ao recuperar sessão inicial:', error);
+        if (error) {
+          if (!isAbortError(error)) {
+            console.error('Erro ao recuperar sessão inicial:', error);
+          }
+
+          if (isMounted.current) {
+            setSession(null);
+            setUser(null);
+          }
+          return;
         }
-        
+
+        if (!initialSession) {
+          if (isMounted.current) {
+            setSession(null);
+            setUser(null);
+          }
+          return;
+        }
+
         if (isMounted.current) {
           await applySession(initialSession);
         }
       } catch (error) {
         console.error('Erro na inicialização da auth:', error);
+        if (isMounted.current) {
+          setSession(null);
+          setUser(null);
+        }
       } finally {
         if (isMounted.current) {
           setLoading(false);
