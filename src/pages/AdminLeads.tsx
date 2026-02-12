@@ -32,6 +32,13 @@ const dropAnimation: DropAnimation = {
 
 // === COMPONENTES INTERNOS ===
 
+
+const isAbortError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const maybe = error as { name?: string; message?: string };
+  return maybe.name === 'AbortError' || maybe.message?.includes('AbortError') === true;
+};
+
 const DroppableColumn = ({
   id,
   children,
@@ -212,10 +219,16 @@ const AdminLeads: React.FC = () => {
   );
 
   const fetchLeads = async () => {
-    try {
-      if (!user?.id) return;
-      setLoading(true);
+    if (!user?.id) return;
 
+    const shouldShowInitialLoading = leads.length === 0;
+    if (shouldShowInitialLoading) {
+      setLoading(true);
+    }
+
+    let aborted = false;
+
+    try {
       let query = supabase
         .from('leads')
         .select(`
@@ -237,9 +250,16 @@ const AdminLeads: React.FC = () => {
       if (error) throw error;
       if (data) setLeads(data as Lead[]);
     } catch (error) {
+      if (isAbortError(error)) {
+        aborted = true;
+        return;
+      }
+
       console.error('Erro ao buscar leads:', error);
     } finally {
-      setLoading(false);
+      if (!aborted && shouldShowInitialLoading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -285,7 +305,7 @@ const AdminLeads: React.FC = () => {
     });
   }, [selectedLead]);
 
-  if (loading) return <Loading />;
+  if (loading && leads.length === 0) return <Loading />;
 
   return (
     <div className="h-[calc(100vh-2rem)] flex flex-col animate-fade-in">

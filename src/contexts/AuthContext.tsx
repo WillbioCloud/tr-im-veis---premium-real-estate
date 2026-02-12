@@ -141,11 +141,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // Carrega o perfil do banco
-    const fullUser = await fetchProfileData(nextSession.user);
-    
-    if (isMounted.current) {
-      setUser(fullUser);
+    try {
+      // Carrega o perfil do banco
+      const fullUser = await fetchProfileData(nextSession.user);
+
+      if (isMounted.current) {
+        setUser(fullUser);
+      }
+    } catch (error) {
+      if (!isAbortError(error)) {
+        console.error('Erro ao aplicar sessão com perfil. Mantendo sessão com fallback:', error);
+      }
+
+      if (isMounted.current) {
+        setUser(buildFallbackUser(nextSession.user));
+      }
     }
   }, [fetchProfileData]);
 
@@ -163,8 +173,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const initializeAuth = async () => {
       try {
-        // 1. Pega sessão inicial
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+
+        if (error && !isAbortError(error)) {
+          console.error('Erro ao recuperar sessão inicial:', error);
+        }
         
         if (isMounted.current) {
           await applySession(initialSession);

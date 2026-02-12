@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { Icons } from '../components/Icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-
-const TWO_MINUTES = 2 * 60 * 1000;
+import { supabase } from '../lib/supabase';
 
 const AdminLayout: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -12,7 +11,7 @@ const AdminLayout: React.FC = () => {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const lastBlurAtRef = useRef<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const roleLabel = useMemo(() => {
     if (user?.role === 'admin') return 'Administrador';
@@ -20,33 +19,29 @@ const AdminLayout: React.FC = () => {
     return `${user.role.charAt(0).toUpperCase()}${user.role.slice(1)}`;
   }, [user?.role]);
 
-  const doRefresh = () => {
-    setRefreshKey(prev => prev + 1);
-    setIsMobileMenuOpen(false);
-  };
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
 
-  useEffect(() => {
-    const onBlur = () => {
-      lastBlurAtRef.current = Date.now();
-    };
+    setIsRefreshing(true);
 
-    const onFocus = () => {
-      if (!lastBlurAtRef.current) return;
-      const awayTime = Date.now() - lastBlurAtRef.current;
-      if (awayTime >= TWO_MINUTES) {
-        doRefresh();
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+
+      if (error || !data.session) {
+        window.location.reload();
+        return;
       }
-      lastBlurAtRef.current = null;
-    };
 
-    window.addEventListener('blur', onBlur);
-    window.addEventListener('focus', onFocus);
-
-    return () => {
-      window.removeEventListener('blur', onBlur);
-      window.removeEventListener('focus', onFocus);
-    };
-  }, []);
+      setRefreshKey((prev) => prev + 1);
+      setIsMobileMenuOpen(false);
+      window.alert('Sistema atualizado com sucesso.');
+    } catch (error) {
+      console.error('Falha ao atualizar sessão. Recarregando aplicação:', error);
+      window.location.reload();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
 
   useEffect(() => {
@@ -155,11 +150,13 @@ const AdminLayout: React.FC = () => {
           </div>
 
           <button
-            onClick={doRefresh}
-            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs md:text-sm font-bold text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors"
-            title="Recarregar as telas administrativas"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs md:text-sm font-bold text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            title="Atualizar sessão e recarregar as telas administrativas"
           >
-            <Icons.RefreshCw size={16} /> Atualizar Sistema
+            <Icons.RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+            {isRefreshing ? 'Atualizando...' : 'Atualizar Sistema'}
           </button>
         </header>
 

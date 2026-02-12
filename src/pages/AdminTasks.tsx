@@ -15,6 +15,12 @@ interface ProfileOption {
   name: string;
 }
 
+const isAbortError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const maybe = error as { name?: string; message?: string };
+  return maybe.name === 'AbortError' || maybe.message?.includes('AbortError') === true;
+};
+
 const AdminTasks: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -40,7 +46,13 @@ const AdminTasks: React.FC = () => {
 
   const fetchTasks = async () => {
     if (!user?.id) return;
-    setLoading(true);
+
+    const shouldShowInitialLoading = tasks.length === 0;
+    if (shouldShowInitialLoading) {
+      setLoading(true);
+    }
+
+    let aborted = false;
 
     try {
       let query = supabase.from('tasks').select('*, leads(name, phone)').order('due_date', { ascending: true });
@@ -60,9 +72,16 @@ const AdminTasks: React.FC = () => {
       if (error) throw error;
       setTasks((data as TaskWithLead[]) ?? []);
     } catch (error) {
+      if (isAbortError(error)) {
+        aborted = true;
+        return;
+      }
+
       console.error('Erro ao carregar tarefas:', error);
     } finally {
-      setLoading(false);
+      if (!aborted && shouldShowInitialLoading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -163,7 +182,7 @@ const AdminTasks: React.FC = () => {
         </button>
       </form>
 
-      {loading ? (
+      {loading && tasks.length === 0 ? (
         <div className="p-12 text-center text-gray-400">Carregando...</div>
       ) : (
         <div className="space-y-5">

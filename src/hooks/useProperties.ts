@@ -16,6 +16,13 @@ type RawProperty = Omit<Property, 'location'> & {
   } | null;
 };
 
+
+const isAbortError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const maybe = error as { name?: string; message?: string; code?: string | number };
+  return maybe.name === 'AbortError' || maybe.message?.includes('AbortError') === true || maybe.code === 20 || maybe.code === '20';
+};
+
 const normalizeProperty = (p: RawProperty): Property => ({
   ...p,
   location: {
@@ -42,11 +49,19 @@ export function useProperties() {
   
   // Ref para controlar o canal de realtime
   const channelRef = useRef<any>(null);
+  const hasLoadedOnceRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
 
     const fetchProperties = async () => {
+      const shouldShowInitialLoading = !hasLoadedOnceRef.current;
+      if (shouldShowInitialLoading) {
+        setLoading(true);
+      }
+
+      let aborted = false;
+
       try {
         // Tenta buscar COM os dados do corretor (JOIN)
         // Isso requer que a tabela 'profiles' tenha permissão de leitura pública (SELECT TO public)
@@ -65,30 +80,48 @@ export function useProperties() {
           const mapped = data.map((p) => normalizeProperty(p as any));
           setProperties(mapped);
           setError(null);
+          hasLoadedOnceRef.current = true;
         }
 
       } catch (err) {
+        if (isAbortError(err)) {
+          aborted = true;
+          return;
+        }
+
         // FALLBACK: Se falhar (provavelmente RLS em profiles), busca apenas os dados do imóvel
         console.warn('Busca com JOIN falhou, tentando busca simples...', err);
-        
-        const { data: simpleData, error: simpleError } = await supabase
-          .from('properties')
-          .select('*')
-          .order('created_at', { ascending: false });
 
-        if (isMounted) {
-          if (simpleError) {
-            console.error('Erro fatal ao buscar imóveis:', simpleError);
-            setError('Não foi possível carregar os imóveis.');
-          } else if (simpleData) {
+        try {
+          const { data: simpleData, error: simpleError } = await supabase
+            .from('properties')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (simpleError) throw simpleError;
+
+          if (isMounted && simpleData) {
             // Mapeia sem os dados do agente
             const mapped = simpleData.map((p) => normalizeProperty({ ...p, agent: null } as any));
             setProperties(mapped);
             setError(null);
+            hasLoadedOnceRef.current = true;
+          }
+        } catch (simpleError) {
+          if (isAbortError(simpleError)) {
+            aborted = true;
+            return;
+          }
+
+          if (isMounted) {
+            console.error('Erro fatal ao buscar imóveis:', simpleError);
+            setError('Não foi possível carregar os imóveis.');
           }
         }
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted && !aborted && shouldShowInitialLoading) {
+          setLoading(false);
+        }
       }
     };
 
