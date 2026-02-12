@@ -25,18 +25,18 @@ const AdminLayout: React.FC = () => {
     setIsRefreshing(true);
 
     try {
-      const { data, error } = await supabase.auth.refreshSession();
+      console.log('Tentando renovar sessão...');
 
-      if (error || !data.session) {
-        window.location.reload();
-        return;
-      }
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), 3000)
+      );
+
+      await Promise.race([supabase.auth.refreshSession(), timeoutPromise]);
 
       setRefreshKey((prev) => prev + 1);
       setIsMobileMenuOpen(false);
-      window.alert('Sistema atualizado com sucesso.');
     } catch (error) {
-      console.error('Falha ao atualizar sessão. Recarregando aplicação:', error);
+      console.warn('Recuperação demorou muito. Forçando reload total.', error);
       window.location.reload();
     } finally {
       setIsRefreshing(false);

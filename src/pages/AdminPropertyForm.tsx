@@ -451,31 +451,51 @@ const AdminPropertyForm: React.FC = () => {
 
           {step === 'basic' && (
             <div className="space-y-6">
-              <div className="inline-flex bg-slate-100 rounded-full p-1">
-                <button
-                  type="button"
-                  onClick={() => handleInput('listing_type', 'sale')}
-                  className={`px-5 py-2 rounded-full font-semibold text-sm transition-all ${
+              <fieldset className="inline-flex bg-slate-100 rounded-full p-1">
+                <legend className="sr-only">Tipo de anúncio</legend>
+                <input
+                  id="listing-sale"
+                  name="listing_type"
+                  type="radio"
+                  value="sale"
+                  checked={formData.listing_type === 'sale'}
+                  onChange={() => handleInput('listing_type', 'sale')}
+                  className="sr-only"
+                />
+                <label
+                  htmlFor="listing-sale"
+                  className={`px-5 py-2 rounded-full font-semibold text-sm transition-all cursor-pointer ${
                     formData.listing_type === 'sale' ? 'bg-slate-900 text-white' : 'text-slate-600'
                   }`}
                 >
                   Venda
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleInput('listing_type', 'rent')}
-                  className={`px-5 py-2 rounded-full font-semibold text-sm transition-all ${
+                </label>
+
+                <input
+                  id="listing-rent"
+                  name="listing_type"
+                  type="radio"
+                  value="rent"
+                  checked={formData.listing_type === 'rent'}
+                  onChange={() => handleInput('listing_type', 'rent')}
+                  className="sr-only"
+                />
+                <label
+                  htmlFor="listing-rent"
+                  className={`px-5 py-2 rounded-full font-semibold text-sm transition-all cursor-pointer ${
                     formData.listing_type === 'rent' ? 'bg-slate-900 text-white' : 'text-slate-600'
                   }`}
                 >
                   Aluguel
-                </button>
-              </div>
+                </label>
+              </fieldset>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-bold text-slate-600 mb-2">Título do anúncio</label>
+                  <label htmlFor="title" className="block text-sm font-bold text-slate-600 mb-2">Título do anúncio</label>
                   <input
+                    id="title"
+                    name="title"
                     required
                     value={formData.title}
                     onChange={(e) => handleInput('title', e.target.value)}
@@ -485,8 +505,10 @@ const AdminPropertyForm: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-slate-600 mb-2">Tipo de imóvel</label>
+                  <label htmlFor="type" className="block text-sm font-bold text-slate-600 mb-2">Tipo de imóvel</label>
                   <select
+                    id="type"
+                    name="type"
                     value={formData.type}
                     onChange={(e) => handleInput('type', e.target.value)}
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-brand-500"
@@ -498,10 +520,12 @@ const AdminPropertyForm: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-slate-600 mb-2">
+                  <label htmlFor="price" className="block text-sm font-bold text-slate-600 mb-2">
                     {formData.listing_type === 'sale' ? 'Preço de venda (R$)' : 'Aluguel mensal (R$)'}
                   </label>
                   <input
+                    id="price"
+                    name="price"
                     required
                     type="number"
                     min={0}
@@ -513,8 +537,10 @@ const AdminPropertyForm: React.FC = () => {
 
                 {formData.listing_type === 'rent' ? (
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-600 mb-2">Pacote (condomínio + taxas) (R$)</label>
+                    <label htmlFor="rent_package_price" className="block text-sm font-bold text-slate-600 mb-2">Pacote (condomínio + taxas) (R$)</label>
                     <input
+                      id="rent_package_price"
+                      name="rent_package_price"
                       type="number"
                       min={0}
                       value={formData.rent_package_price}
@@ -525,8 +551,10 @@ const AdminPropertyForm: React.FC = () => {
                 ) : (
                   <>
                     <div>
-                      <label className="block text-sm font-bold text-slate-600 mb-2">Valor de entrada (R$)</label>
+                      <label htmlFor="down_payment" className="block text-sm font-bold text-slate-600 mb-2">Valor de entrada (R$)</label>
                       <input
+                        id="down_payment"
+                        name="down_payment"
                         type="number"
                         min={0}
                         value={formData.down_payment}
@@ -535,8 +563,10 @@ const AdminPropertyForm: React.FC = () => {
                       />
                     </div>
                     <div className="flex items-end">
-                      <label className="w-full inline-flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                      <label htmlFor="financing_available" className="w-full inline-flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
                         <input
+                          id="financing_available"
+                          name="financing_available"
                           type="checkbox"
                           checked={formData.financing_available}
                           onChange={(e) => handleInput('financing_available', e.target.checked)}
@@ -554,28 +584,30 @@ const AdminPropertyForm: React.FC = () => {
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-bold text-slate-600 mb-2">Quartos</label>
-                  <input type="number" min={0} value={formData.bedrooms} onChange={(e) => handleInput('bedrooms', Number(e.target.value))} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
+                  <label htmlFor="bedrooms" className="block text-sm font-bold text-slate-600 mb-2">Quartos</label>
+                  <input id="bedrooms" name="bedrooms" type="number" min={0} value={formData.bedrooms} onChange={(e) => handleInput('bedrooms', Number(e.target.value))} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-600 mb-2">Banheiros</label>
-                  <input type="number" min={0} value={formData.bathrooms} onChange={(e) => handleInput('bathrooms', Number(e.target.value))} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
+                  <label htmlFor="bathrooms" className="block text-sm font-bold text-slate-600 mb-2">Banheiros</label>
+                  <input id="bathrooms" name="bathrooms" type="number" min={0} value={formData.bathrooms} onChange={(e) => handleInput('bathrooms', Number(e.target.value))} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-600 mb-2">Vagas</label>
-                  <input type="number" min={0} value={formData.garage} onChange={(e) => handleInput('garage', Number(e.target.value))} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
+                  <label htmlFor="garage" className="block text-sm font-bold text-slate-600 mb-2">Vagas</label>
+                  <input id="garage" name="garage" type="number" min={0} value={formData.garage} onChange={(e) => handleInput('garage', Number(e.target.value))} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-600 mb-2">Área (m²)</label>
-                  <input type="number" min={0} value={formData.area} onChange={(e) => handleInput('area', Number(e.target.value))} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
+                  <label htmlFor="area" className="block text-sm font-bold text-slate-600 mb-2">Área (m²)</label>
+                  <input id="area" name="area" type="number" min={0} value={formData.area} onChange={(e) => handleInput('area', Number(e.target.value))} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-slate-600 mb-2">CEP</label>
+                  <label htmlFor="zip_code" className="block text-sm font-bold text-slate-600 mb-2">CEP</label>
                   <div className="flex gap-2">
                     <input
+                      id="zip_code"
+                      name="zip_code"
                       value={formData.zip_code}
                       onChange={(e) => handleInput('zip_code', e.target.value)}
                       onBlur={fetchAddressByCep}
@@ -592,29 +624,29 @@ const AdminPropertyForm: React.FC = () => {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-600 mb-2">Rua / Endereço</label>
-                  <input value={formData.address} onChange={(e) => handleInput('address', e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
+                  <label htmlFor="address" className="block text-sm font-bold text-slate-600 mb-2">Rua / Endereço</label>
+                  <input id="address" name="address" value={formData.address} onChange={(e) => handleInput('address', e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-600 mb-2">Bairro</label>
-                  <input value={formData.neighborhood} onChange={(e) => handleInput('neighborhood', e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
+                  <label htmlFor="neighborhood" className="block text-sm font-bold text-slate-600 mb-2">Bairro</label>
+                  <input id="neighborhood" name="neighborhood" value={formData.neighborhood} onChange={(e) => handleInput('neighborhood', e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-bold text-slate-600 mb-2">Cidade</label>
-                    <input value={formData.city} onChange={(e) => handleInput('city', e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
+                    <label htmlFor="city" className="block text-sm font-bold text-slate-600 mb-2">Cidade</label>
+                    <input id="city" name="city" value={formData.city} onChange={(e) => handleInput('city', e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-600 mb-2">UF</label>
-                    <input value={formData.state} onChange={(e) => handleInput('state', e.target.value.toUpperCase())} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" maxLength={2} />
+                    <label htmlFor="state" className="block text-sm font-bold text-slate-600 mb-2">UF</label>
+                    <input id="state" name="state" value={formData.state} onChange={(e) => handleInput('state', e.target.value.toUpperCase())} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" maxLength={2} />
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-slate-600 mb-2">Comodidades</label>
+                <label htmlFor="new-feature" className="block text-sm font-bold text-slate-600 mb-2">Comodidades</label>
                 <div className="flex flex-col md:flex-row gap-2 mb-3">
-                  <input value={newFeature} onChange={(e) => setNewFeature(e.target.value)} placeholder="Ex: Piscina aquecida" className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
+                  <input id="new-feature" name="new_feature" value={newFeature} onChange={(e) => setNewFeature(e.target.value)} placeholder="Ex: Piscina aquecida" className="flex-1 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" />
                   <button type="button" onClick={addFeature} className="px-5 py-3 rounded-xl bg-slate-900 text-white font-semibold">Adicionar</button>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -629,7 +661,7 @@ const AdminPropertyForm: React.FC = () => {
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-bold text-slate-600">Descrição</label>
+                  <label htmlFor="description" className="block text-sm font-bold text-slate-600">Descrição</label>
                   <button
                     type="button"
                     onClick={generateDescriptionWithAI}
@@ -639,6 +671,8 @@ const AdminPropertyForm: React.FC = () => {
                   </button>
                 </div>
                 <textarea
+                  id="description"
+                  name="description"
                   rows={6}
                   value={formData.description}
                   onChange={(e) => handleInput('description', e.target.value)}
@@ -653,9 +687,11 @@ const AdminPropertyForm: React.FC = () => {
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-400 mb-2 uppercase">Adicionar por URL</label>
+                  <label htmlFor="new-image-url" className="block text-xs font-bold text-slate-400 mb-2 uppercase">Adicionar por URL</label>
                   <div className="flex gap-2">
                     <input
+                      id="new-image-url"
+                      name="new_image_url"
                       value={newImageUrl}
                       onChange={(e) => setNewImageUrl(e.target.value)}
                       placeholder="https://..."
@@ -669,6 +705,8 @@ const AdminPropertyForm: React.FC = () => {
                   <label className="block text-xs font-bold text-slate-400 mb-2 uppercase">Upload do dispositivo</label>
                   <label className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center gap-2 cursor-pointer hover:border-brand-400 transition-colors">
                     <input
+                      id="media_upload"
+                      name="media_upload"
                       type="file"
                       accept="image/*"
                       multiple
@@ -714,8 +752,10 @@ const AdminPropertyForm: React.FC = () => {
           {step === 'seo' && (
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-bold text-slate-600 mb-2">SEO Title</label>
+                  <label htmlFor="seo_title" className="block text-sm font-bold text-slate-600 mb-2">SEO Title</label>
                 <input
+                  id="seo_title"
+                  name="seo_title"
                   value={formData.seo_title}
                   onChange={(e) => handleInput('seo_title', e.target.value)}
                   className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl"
@@ -723,8 +763,10 @@ const AdminPropertyForm: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-slate-600 mb-2">SEO Description</label>
+                <label htmlFor="seo_description" className="block text-sm font-bold text-slate-600 mb-2">SEO Description</label>
                 <textarea
+                  id="seo_description"
+                  name="seo_description"
                   rows={4}
                   value={formData.seo_description}
                   onChange={(e) => handleInput('seo_description', e.target.value)}
