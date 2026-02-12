@@ -4,10 +4,11 @@ import PropertyCard from '../components/PropertyCard';
 import { Icons } from '../components/Icons';
 import { useProperties } from '../hooks/useProperties';
 import Loading from '../components/Loading';
+import { ListingType } from '../types';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
-  const [listingMode, setListingMode] = useState<'comprar' | 'alugar'>('comprar');
+  const [listingMode, setListingMode] = useState<ListingType>('sale');
   const [selectedCity, setSelectedCity] = useState('');
   const [selectedNeighborhood, setSelectedNeighborhood] = useState('');
   const [selectedType, setSelectedType] = useState('');
@@ -31,7 +32,7 @@ const Home: React.FC = () => {
     if (selectedCity) params.set('city', selectedCity);
     if (selectedNeighborhood) params.set('neighborhood', selectedNeighborhood);
     if (selectedType) params.set('type', selectedType);
-    params.set('mode', listingMode);
+    params.set('listingType', listingMode);
 
     const query = params.toString();
     navigate(query ? `/imoveis?${query}` : '/imoveis');
@@ -69,13 +70,13 @@ const Home: React.FC = () => {
             <div className="w-full max-w-4xl flex justify-center md:justify-start mb-4">
               <div className="bg-white/95 rounded-full p-1 shadow-xl inline-flex gap-1">
                 {[
-                  { value: 'comprar', label: 'Comprar' },
-                  { value: 'alugar', label: 'Alugar' }
+                  { value: 'sale', label: 'Comprar' },
+                  { value: 'rent', label: 'Alugar' }
                 ].map((option) => (
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => setListingMode(option.value as 'comprar' | 'alugar')}
+                    onClick={() => setListingMode(option.value as ListingType)}
                     className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all ${
                       listingMode === option.value
                         ? 'bg-slate-900 text-white shadow'

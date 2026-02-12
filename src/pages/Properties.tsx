@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import PropertyCard from '../components/PropertyCard';
 import { Icons } from '../components/Icons';
-import { Property, PropertyType } from '../types';
+import { ListingType, Property, PropertyType } from '../types';
 
 const Properties: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -13,6 +13,15 @@ const Properties: React.FC = () => {
   const currentCity = searchParams.get('city') || '';
   const currentNeighborhood = searchParams.get('neighborhood') || '';
   const currentType = searchParams.get('type') || '';
+  const listingType = (searchParams.get('listingType') as ListingType) || 'sale';
+
+  useEffect(() => {
+    if (searchParams.get('listingType')) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('listingType', 'sale');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     let isMounted = true;
@@ -30,6 +39,7 @@ const Properties: React.FC = () => {
         if (currentCity) query = query.ilike('city', `%${currentCity}%`);
         if (currentNeighborhood) query = query.ilike('neighborhood', `%${currentNeighborhood}%`);
         if (currentType) query = query.eq('type', currentType);
+        query = query.eq('listing_type', listingType);
 
         const { data, error } = await query;
 
@@ -69,7 +79,7 @@ const Properties: React.FC = () => {
       isMounted = false; 
       controller.abort();
     };
-  }, [currentCity, currentNeighborhood, currentType]);
+  }, [currentCity, currentNeighborhood, currentType, listingType]);
 
   const cities = useMemo(
     () => Array.from(new Set(properties.map((property) => property.location.city).filter(Boolean))).sort(),
@@ -99,6 +109,12 @@ const Properties: React.FC = () => {
     setSearchParams(nextParams);
   };
 
+  const handleListingTypeChange = (value: ListingType) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('listingType', value);
+    setSearchParams(nextParams);
+  };
+
   return (
     <div className="bg-gray-50 min-h-screen py-12 md:py-20 animate-fade-in">
       <div className="container mx-auto px-4">
@@ -107,6 +123,26 @@ const Properties: React.FC = () => {
           <div>
             <h1 className="text-3xl md:text-4xl font-serif font-bold text-slate-800 mb-2">Imóveis Exclusivos</h1>
             <p className="text-slate-500 text-sm md:text-base">Encontre o lar dos seus sonhos em nossa seleção premium.</p>
+          </div>
+
+          <div className="bg-white/95 rounded-full p-1 shadow-xl inline-flex gap-1 w-fit">
+            {[
+              { value: 'sale', label: 'Comprar' },
+              { value: 'rent', label: 'Alugar' }
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => handleListingTypeChange(option.value as ListingType)}
+                className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all ${
+                  listingType === option.value
+                    ? 'bg-slate-900 text-white shadow'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
 
           <div className="w-full md:w-auto bg-white rounded-3xl md:rounded-full p-3 shadow-md border border-slate-100">
@@ -171,9 +207,11 @@ const Properties: React.FC = () => {
         ) : (
           <div className="text-center py-20 bg-white rounded-xl shadow-sm border border-dashed border-gray-300">
             <Icons.Search className="mx-auto text-gray-300 mb-4" size={48} />
-            <h3 className="text-xl font-bold text-gray-700">Nenhum imóvel encontrado</h3>
+            <h3 className="text-xl font-bold text-gray-700">
+              {listingType === 'rent' ? 'Nenhum imóvel para aluguel encontrado neste local' : 'Nenhum imóvel encontrado'}
+            </h3>
             <p className="text-gray-500">Tente ajustar os filtros ou verificar a conexão.</p>
-            <button onClick={() => setSearchParams({})} className="mt-4 text-brand-600 font-bold hover:underline">
+            <button onClick={() => setSearchParams({ listingType })} className="mt-4 text-brand-600 font-bold hover:underline">
               Limpar Filtros
             </button>
           </div>

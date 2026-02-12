@@ -18,6 +18,8 @@ import Home from './pages/Home';
 import Properties from './pages/Properties';
 import PropertyDetail from './pages/PropertyDetail';
 import Login from './pages/Login';
+import About from './pages/About';
+import Services from './pages/Services';
 
 // Admin Pages
 import AdminDashboard from './pages/AdminDashboard';
@@ -64,8 +66,8 @@ const App: React.FC = () => {
             
             {/* SEO / Landing Pages */}
             <Route path="/bairros/:slug" element={<PageWrapper><Properties /></PageWrapper>} />
-            <Route path="/servicos" element={<PageWrapper><div className="pt-20 text-center dark:text-white">Serviços</div></PageWrapper>} />
-            <Route path="/sobre" element={<PageWrapper><div className="pt-20 text-center dark:text-white">Sobre Nós</div></PageWrapper>} />
+            <Route path="/servicos" element={<PageWrapper><Services /></PageWrapper>} />
+            <Route path="/sobre" element={<PageWrapper><About /></PageWrapper>} />
             <Route path="/contato" element={<PageWrapper><div className="pt-20 text-center dark:text-white">Contato</div></PageWrapper>} />
 
             {/* Admin Login */}
