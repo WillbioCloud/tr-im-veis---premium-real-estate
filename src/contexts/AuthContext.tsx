@@ -130,34 +130,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Aplica a sessão e carrega o usuário enriquecido
-  const applySession = useCallback(async (nextSession: Session | null) => {
-    if (!isMounted.current) return;
-    
-    setSession(nextSession);
-
-    if (!nextSession?.user) {
+  // 1. Função blindada para aplicar sessão sem quebrar o app
+  const applySession = useCallback(async (currentSession: Session | null) => {
+    if (!currentSession?.user) {
+      setSession(null);
       setUser(null);
       return;
     }
 
     try {
-      // Carrega o perfil do banco
-      const fullUser = await fetchProfileData(nextSession.user);
+      setSession(currentSession);
 
-      if (isMounted.current) {
-        setUser(fullUser);
-      }
-    } catch (error) {
-      if (!isAbortError(error)) {
-        console.error('Erro ao aplicar sessão com perfil. Mantendo sessão com fallback:', error);
+      // Tenta buscar o perfil, mas NÃO TRAVA se falhar
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', currentSession.user.id)
+        .single();
+
+      if (error) {
+        console.warn('Perfil não carregado (usando fallback):', error.message);
       }
 
-      if (isMounted.current) {
-        setUser(buildFallbackUser(nextSession.user));
-      }
+      // Monta o usuário mesclando dados da sessão + perfil (ou fallback)
+      const userWithRole: UserWithRole = {
+        ...currentSession.user,
+        role: profile?.role || 'corretor',
+        name: profile?.name || currentSession.user.user_metadata?.name || 'Usuário',
+        avatar_url: profile?.avatar_url,
+        level: profile?.level || 1,
+        xp: profile?.xp || 0,
+        active: profile?.active ?? true,
+      };
+
+      setUser(userWithRole);
+    } catch (err) {
+      console.error('Erro crítico no applySession:', err);
+      // Mesmo com erro crítico, mantemos o usuário logado com dados básicos
+      setUser({ ...currentSession.user, role: 'corretor' } as UserWithRole);
     }
-  }, [fetchProfileData]);
+  }, []);
 
   // Função exposta para recarregar dados manualmente
   const refreshUser = async () => {
@@ -168,69 +180,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // 2. useEffect com Listener de Visibilidade e Inicialização
   useEffect(() => {
-    isMounted.current = true;
+    let mounted = true;
 
-    const initializeAuth = async () => {
+    const initAuth = async () => {
       try {
-        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
-
-        if (error) {
-          if (!isAbortError(error)) {
-            console.error('Erro ao recuperar sessão inicial:', error);
-          }
-
-          if (isMounted.current) {
-            setSession(null);
-            setUser(null);
-          }
-          return;
-        }
-
-        if (!initialSession) {
-          if (isMounted.current) {
-            setSession(null);
-            setUser(null);
-          }
-          return;
-        }
-
-        if (isMounted.current) {
-          await applySession(initialSession);
+        // Busca sessão inicial
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && mounted) {
+          await applySession(session);
         }
       } catch (error) {
-        console.error('Erro na inicialização da auth:', error);
-        if (isMounted.current) {
-          setSession(null);
-          setUser(null);
-        }
+        console.error('Erro na inicialização:', error);
       } finally {
-        if (isMounted.current) {
-          setLoading(false);
+        if (mounted) setLoading(false);
+      }
+    };
+
+    initAuth();
+
+    // Listener de eventos do Supabase
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        await applySession(session);
+      } else if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+      }
+    });
+
+    // 3. NOVO: Listener para quando o usuário troca de aba e volta
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        console.log('Aba visível: Revalidando sessão...');
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          await applySession(data.session);
         }
       }
     };
 
-    // Inicia processo
-    initializeAuth();
-
-    // 2. Escuta mudanças (Login, Logout, Token Refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
-      if (isMounted.current) {
-        if (_event === 'SIGNED_OUT') {
-           setSession(null);
-           setUser(null);
-           setLoading(false);
-        } else {
-           await applySession(nextSession);
-           setLoading(false);
-        }
-      }
-    });
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      isMounted.current = false;
+      mounted = false;
       subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [applySession]);
 

@@ -27,32 +27,23 @@ const AdminLayout: React.FC = () => {
     try {
       console.log('Tentando renovar sessão...');
 
+      // Timeout de 3 segundos
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Timeout')), 3000)
       );
 
-      const { data, error } = (await Promise.race([
+      // Competição: Renovar Sessão vs Timeout
+      await Promise.race([
         supabase.auth.refreshSession(),
         timeoutPromise,
-      ])) as Awaited<ReturnType<typeof supabase.auth.refreshSession>>;
+      ]);
 
-      if (error || !data.session) {
-        throw new Error('Sessão inválida');
-      }
-
-      console.log('Sessão renovada!');
+      // Se passou, remonta a tela
       setRefreshKey((prev) => prev + 1);
-      setIsMobileMenuOpen(false);
     } catch (error) {
-      console.warn('Falha crítica na sessão. Efetuando logout forçado e limpo.', error);
-
-      await supabase.auth.signOut({ scope: 'local' });
-
-      Object.keys(localStorage)
-        .filter((key) => key.startsWith('sb-'))
-        .forEach((key) => localStorage.removeItem(key));
-
-      window.location.href = '/admin/login';
+      console.warn('Conexão lenta. Recarregando a página para restaurar...', error);
+      // CORREÇÃO: Apenas F5. Mantém o login e conserta o socket travado.
+      window.location.reload(); 
     } finally {
       setIsRefreshing(false);
     }
