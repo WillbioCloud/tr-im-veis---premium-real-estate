@@ -7,16 +7,34 @@ import Loading from '../components/Loading';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [listingMode, setListingMode] = useState<'comprar' | 'alugar'>('comprar');
+  const [selectedCity, setSelectedCity] = useState('');
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState('');
+  const [selectedType, setSelectedType] = useState('');
   const { properties, loading } = useProperties();
+
+  const cities = Array.from(new Set(properties.map((property) => property.location.city).filter(Boolean))).sort();
+  const neighborhoods = Array.from(
+    new Set(
+      properties
+        .filter((property) => !selectedCity || property.location.city === selectedCity)
+        .map((property) => property.location.neighborhood)
+        .filter(Boolean)
+    )
+  ).sort();
+  const propertyTypes = Array.from(new Set(properties.map((property) => property.type).filter(Boolean))).sort();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchTerm) {
-      navigate(`/imoveis?city=${encodeURIComponent(searchTerm)}`);
-    } else {
-      navigate('/imoveis');
-    }
+
+    const params = new URLSearchParams();
+    if (selectedCity) params.set('city', selectedCity);
+    if (selectedNeighborhood) params.set('neighborhood', selectedNeighborhood);
+    if (selectedType) params.set('type', selectedType);
+    params.set('mode', listingMode);
+
+    const query = params.toString();
+    navigate(query ? `/imoveis?${query}` : '/imoveis');
   };
 
   const featuredProperties = properties.filter(p => p.featured).slice(0, 3);
@@ -41,31 +59,86 @@ const Home: React.FC = () => {
 
             {/* Conteúdo Central */}
             <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-4">
-            <h1 className="text-4xl md:text-7xl font-semibold tracking-tight text-white mb-6 drop-shadow-lg">
+            <h1 className="text-3xl sm:text-4xl md:text-7xl font-semibold tracking-tight text-white mb-4 md:mb-6 drop-shadow-lg">
                 Imóveis para viver <br/> e investir
             </h1>
-            <p className="text-lg md:text-xl text-white/90 mb-12 max-w-2xl font-light">
+            <p className="text-base md:text-xl text-white/90 mb-8 md:mb-12 max-w-2xl font-light">
                 A curadoria mais exclusiva do mercado imobiliário.
             </p>
 
+            <div className="w-full max-w-4xl flex justify-center md:justify-start mb-4">
+              <div className="bg-white/95 rounded-full p-1 shadow-xl inline-flex gap-1">
+                {[
+                  { value: 'comprar', label: 'Comprar' },
+                  { value: 'alugar', label: 'Alugar' }
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setListingMode(option.value as 'comprar' | 'alugar')}
+                    className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all ${
+                      listingMode === option.value
+                        ? 'bg-slate-900 text-white shadow'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Barra de Busca Estilo "Cápsula" */}
-            <form onSubmit={handleSearch} className="w-full max-w-4xl bg-white p-2 rounded-full shadow-xl flex flex-col md:flex-row items-center gap-2 animate-slide-up">
-                <div className="flex-1 w-full flex items-center px-6 py-3 border-r border-gray-100">
-                    <Icons.MapPin className="text-slate-400 mr-3" size={20} />
-                    <div className="flex flex-col items-start w-full">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Localização</span>
-                        <input 
-                        type="text" 
-                        placeholder="Cidade, bairro ou condomínio" 
-                        className="w-full bg-transparent outline-none text-slate-800 placeholder-slate-400 font-medium"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
+            <form onSubmit={handleSearch} className="w-full max-w-4xl bg-white p-2 rounded-[2rem] md:rounded-full shadow-xl flex flex-col md:flex-row items-stretch md:items-center animate-slide-up">
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-3 md:divide-x md:divide-slate-100">
+                  <div className="w-full px-4 md:px-6 py-3">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Cidade</label>
+                    <select
+                      value={selectedCity}
+                      onChange={(e) => {
+                        setSelectedCity(e.target.value);
+                        setSelectedNeighborhood('');
+                      }}
+                      className="w-full bg-transparent outline-none text-slate-800 font-medium text-sm md:text-base"
+                    >
+                      <option value="">Todas as cidades</option>
+                      {cities.map((city) => (
+                        <option key={city} value={city}>{city}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="w-full px-4 md:px-6 py-3 border-t md:border-t-0 border-slate-100">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Bairro</label>
+                    <select
+                      value={selectedNeighborhood}
+                      onChange={(e) => setSelectedNeighborhood(e.target.value)}
+                      className="w-full bg-transparent outline-none text-slate-800 font-medium text-sm md:text-base"
+                    >
+                      <option value="">Todos os bairros</option>
+                      {neighborhoods.map((neighborhood) => (
+                        <option key={neighborhood} value={neighborhood}>{neighborhood}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="w-full px-4 md:px-6 py-3 border-t md:border-t-0 border-slate-100">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 block">Tipo de imóvel</label>
+                    <select
+                      value={selectedType}
+                      onChange={(e) => setSelectedType(e.target.value)}
+                      className="w-full bg-transparent outline-none text-slate-800 font-medium text-sm md:text-base"
+                    >
+                      <option value="">Todos os tipos</option>
+                      {propertyTypes.map((type) => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 
                 {/* Botão de Busca Preto (Pill Shape) */}
-                <button className="bg-slate-900 hover:bg-black text-white px-8 py-4 rounded-full font-medium transition-all shadow-lg flex items-center gap-2 w-full md:w-auto justify-center">
+                <button className="bg-slate-900 hover:bg-black text-white px-8 py-4 rounded-full font-medium transition-all shadow-lg flex items-center gap-2 w-full md:w-auto justify-center mt-2 md:mt-0 md:ml-2">
                     <Icons.Search size={20} />
                     Buscar
                 </button>

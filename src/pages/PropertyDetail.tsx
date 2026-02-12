@@ -10,7 +10,6 @@ const PropertyDetail: React.FC = () => {
   const navigate = useNavigate();
   const { properties, loading } = useProperties();
   const [property, setProperty] = useState<Property | null>(null);
-  const [activeImage, setActiveImage] = useState(0);
   
   // Estados do formulário de contato
   const [contactForm, setContactForm] = useState({
@@ -84,14 +83,13 @@ const PropertyDetail: React.FC = () => {
 
       {/* --- GALERIA GRID (Rounded aesthetic) --- */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 h-[450px] md:h-[600px] relative">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 h-[300px] md:h-[600px] relative">
             {/* Imagem Principal */}
             <div className="md:col-span-2 md:row-span-2 relative h-full rounded-[2rem] overflow-hidden shadow-sm group">
               <img 
                 src={property.images[0]} 
                 alt={property.title} 
                 className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-700"
-                onClick={() => setActiveImage(0)}
               />
               <div className="absolute top-6 left-6 bg-white/90 backdrop-blur px-4 py-2 rounded-full text-sm font-bold shadow-sm uppercase tracking-wider text-slate-900">
                 {property.type}
@@ -105,12 +103,11 @@ const PropertyDetail: React.FC = () => {
                   src={img} 
                   alt={`View ${idx}`} 
                   className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-700"
-                  onClick={() => setActiveImage(idx + 1)}
                 />
               </div>
             ))}
             
-            <button className="absolute bottom-6 right-6 bg-white text-slate-900 px-6 py-3 rounded-full font-bold shadow-xl hover:bg-slate-50 transition-colors flex items-center gap-2">
+            <button className="hidden md:flex absolute bottom-6 right-6 bg-white text-slate-900 px-6 py-3 rounded-full font-bold shadow-xl hover:bg-slate-50 transition-colors items-center gap-2">
               <Icons.Grid size={18} />
               Ver todas as fotos
             </button>
@@ -124,26 +121,33 @@ const PropertyDetail: React.FC = () => {
           <div className="lg:col-span-8 space-y-12">
             
             {/* Cards de Métricas (Design Clean) */}
-            <div className="flex flex-wrap gap-4 border-b border-slate-200 dark:border-slate-700 pb-8">
-                <div className="px-6 py-4 bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 flex items-center gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-b border-slate-200 dark:border-slate-700 pb-8">
+                <div className="px-4 md:px-6 py-4 bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 flex items-center gap-3">
                   <Icons.Maximize size={24} className="text-slate-400" />
                   <div>
                     <span className="block text-xl font-bold text-slate-900 dark:text-white">{property.area} m²</span>
                     <span className="text-xs text-slate-500 font-medium uppercase">Área Útil</span>
                   </div>
                 </div>
-                <div className="px-6 py-4 bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 flex items-center gap-3">
+                <div className="px-4 md:px-6 py-4 bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 flex items-center gap-3">
                   <Icons.Bed size={24} className="text-slate-400" />
                   <div>
                     <span className="block text-xl font-bold text-slate-900 dark:text-white">{property.bedrooms}</span>
                     <span className="text-xs text-slate-500 font-medium uppercase">Quartos</span>
                   </div>
                 </div>
-                <div className="px-6 py-4 bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 flex items-center gap-3">
+                <div className="px-4 md:px-6 py-4 bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 flex items-center gap-3">
                   <Icons.Bath size={24} className="text-slate-400" />
                   <div>
                     <span className="block text-xl font-bold text-slate-900 dark:text-white">{property.bathrooms}</span>
                     <span className="text-xs text-slate-500 font-medium uppercase">Banheiros</span>
+                  </div>
+                </div>
+                <div className="px-4 md:px-6 py-4 bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 flex items-center gap-3">
+                  <Icons.Car size={24} className="text-slate-400" />
+                  <div>
+                    <span className="block text-xl font-bold text-slate-900 dark:text-white">{property.garage}</span>
+                    <span className="text-xs text-slate-500 font-medium uppercase">Vagas</span>
                   </div>
                 </div>
             </div>
@@ -183,11 +187,11 @@ const PropertyDetail: React.FC = () => {
           </div>
 
           {/* --- COLUNA DIREITA (Sticky Sidebar - Estilo Referência) --- */}
-          <div className="lg:col-span-4">
-            <div className="sticky top-8">
+          <div className="lg:col-span-4 mt-2 lg:mt-0">
+            <div className="lg:sticky lg:top-8">
               
               {/* Card Principal */}
-              <div className="bg-white dark:bg-slate-800 p-8 rounded-[2rem] shadow-xl border border-slate-100 dark:border-slate-700">
+              <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-[2rem] shadow-xl border border-slate-100 dark:border-slate-700">
                 {/* Preço */}
                 <div className="mb-8">
                     <p className="text-sm text-slate-500 font-medium uppercase tracking-wide mb-1">Preço de Venda</p>
