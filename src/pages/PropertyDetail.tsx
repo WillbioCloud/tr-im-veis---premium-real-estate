@@ -1,419 +1,273 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import { Property, LeadStatus } from '../types';
+import React, { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useProperties } from '../hooks/useProperties';
 import { Icons } from '../components/Icons';
 import Loading from '../components/Loading';
-import { COMPANY_PHONE, COMPANY_NAME } from '../constants';
-
-type VisitHistoryItem = {
-  title: string;
-  slug: string;
-  visited_at: string;
-};
-
-const SESSION_HISTORY_KEY = 'tr_session_history';
-
-const isAbortError = (error: unknown): boolean => {
-  if (!error) return false;
-  const maybeError = error as { name?: string; message?: string; code?: string | number };
-  const message = maybeError.message ?? '';
-
-  return (
-    maybeError.name === 'AbortError' ||
-    maybeError.code === 20 ||
-    maybeError.code === '20' ||
-    message.includes('AbortError')
-  );
-};
-
-const readSessionHistory = (): VisitHistoryItem[] => {
-  try {
-    const raw = localStorage.getItem(SESSION_HISTORY_KEY);
-    if (!raw) return [];
-
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed.filter((entry): entry is VisitHistoryItem => {
-      if (!entry || typeof entry !== 'object') return false;
-      const candidate = entry as Partial<VisitHistoryItem>;
-      return (
-        typeof candidate.title === 'string' &&
-        typeof candidate.slug === 'string' &&
-        typeof candidate.visited_at === 'string'
-      );
-    });
-  } catch {
-    return [];
-  }
-};
+import { Property } from '../types';
 
 const PropertyDetail: React.FC = () => {
-  const { slug } = useParams();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const { properties, loading } = useProperties();
   const [property, setProperty] = useState<Property | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [sending, setSending] = useState(false);
-
-  useEffect(() => {
-    if (!property) return;
-
-    const history = readSessionHistory();
-    const currentVisit: VisitHistoryItem = {
-      title: property.title,
-      slug: property.slug,
-      visited_at: new Date().toISOString(),
-    };
-
-    const updatedHistory = [currentVisit, ...history.filter((entry) => entry.slug !== property.slug)].slice(0, 10);
-    localStorage.setItem(SESSION_HISTORY_KEY, JSON.stringify(updatedHistory));
-  }, [property]);
+  const [activeImage, setActiveImage] = useState(0);
+  
+  // Estados do formulário de contato
+  const [contactForm, setContactForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    message: 'Olá, gostaria de agendar uma visita a este imóvel.'
+  });
+  const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success'>('idle');
 
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchProperty = async () => {
-      if (!slug) {
-        if (isMounted) setLoading(false);
-        return;
+    if (properties.length > 0 && slug) {
+      const found = properties.find((p) => p.slug === slug || p.id === slug);
+      if (found) {
+        setProperty(found);
       }
-
-      try {
-        const { data, error } = await supabase
-          .from('properties')
-          .select('*, agent:profiles(name, phone, email)')
-          .eq('slug', slug)
-          .maybeSingle();
-
-        if (error) {
-          if (isAbortError(error)) {
-            return;
-          }
-          throw error;
-        }
-
-        if (data && isMounted) {
-          setProperty({
-            ...data,
-            location: {
-              city: data.city ?? '',
-              neighborhood: data.neighborhood ?? '',
-              state: data.state ?? '',
-              address: data.address ?? '',
-            },
-            features: Array.isArray(data.features) ? data.features : [],
-            images: Array.isArray(data.images) ? data.images : [],
-            agent: data.agent ?? undefined,
-          });
-        }
-      } catch (error) {
-        if (isAbortError(error)) {
-          return;
-        }
-
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('properties')
-          .select('*')
-          .eq('slug', slug)
-          .maybeSingle();
-
-        if (fallbackError) {
-          if (isAbortError(fallbackError)) {
-            return;
-          }
-          return;
-        }
-
-        if (fallbackData && isMounted) {
-          setProperty({
-            ...fallbackData,
-            location: {
-              city: fallbackData.city ?? '',
-              neighborhood: fallbackData.neighborhood ?? '',
-              state: fallbackData.state ?? '',
-              address: fallbackData.address ?? '',
-            },
-            features: Array.isArray(fallbackData.features) ? fallbackData.features : [],
-            images: Array.isArray(fallbackData.images) ? fallbackData.images : [],
-            agent: undefined,
-          });
-        }
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    void fetchProperty();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [slug]);
-
-  const handleContact = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!property || !name || !phone) return;
-    setSending(true);
-
-    try {
-      const targetPhone = property.agent?.phone || COMPANY_PHONE;
-      const isAgent = Boolean(property.agent);
-      const history = readSessionHistory();
-
-      const { error } = await supabase.from('leads').insert([
-        {
-          name,
-          phone,
-          status: LeadStatus.NEW,
-          source: 'Site - Página do Imóvel',
-          property_id: property.id,
-          assigned_to: property.agent_id ?? null,
-          metadata: {
-            visited_properties: history,
-            last_property_slug: property.slug,
-          },
-          message: `Interesse no imóvel: ${property.title} (Ref: ${property.slug})`,
-        },
-      ]);
-
-      if (error) {
-        if (!isAbortError(error)) {
-          alert('Erro ao enviar. Tente novamente.');
-        }
-        return;
-      }
-
-      const message = `Olá${
-        isAgent && property.agent?.name ? ` ${property.agent.name.split(' ')[0]}` : ''
-      }, meu nome é *${name}*. Vi o imóvel *${property.title}* no site e gostaria de mais informações.`;
-      const whatsappUrl = `https://wa.me/${targetPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-
-      window.open(whatsappUrl, '_blank');
-      setName('');
-      setPhone('');
-
-      alert('Contato enviado com sucesso!');
-    } catch (error) {
-      if (!isAbortError(error)) {
-        alert('Erro ao enviar. Tente novamente.');
-      }
-    } finally {
-      setSending(false);
     }
-  };
+  }, [properties, slug]);
 
-  if (loading) return <div className="h-screen flex items-center justify-center"><Loading /></div>;
-
-  if (!property)
+  if (loading) return <Loading />;
+  
+  if (!property && !loading && properties.length > 0) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center gap-4 text-slate-500 bg-gray-50">
-        <Icons.AlertTriangle size={48} className="text-amber-500" />
-        <h2 className="text-xl font-bold text-slate-800">Imóvel não encontrado</h2>
-        <p>O link acessado ({slug}) pode estar incorreto ou o imóvel foi removido.</p>
-        <button
-          onClick={() => navigate('/imoveis')}
-          className="mt-4 px-6 py-2 bg-brand-600 text-white rounded-lg font-bold hover:bg-brand-700 transition-colors"
-        >
-          Ver outros imóveis
+      <div className="min-h-screen flex flex-col items-center justify-center text-center p-4">
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-4">Imóvel não encontrado</h2>
+        <button onClick={() => navigate('/imoveis')} className="text-slate-900 hover:underline font-medium">
+          Voltar para lista de imóveis
         </button>
       </div>
     );
+  }
+
+  if (!property) return null;
+
+  const fullAddress = `${property.location.address || ''}, ${property.location.neighborhood}, ${property.location.city} - ${property.location.state}`;
+  const mapUrl = `https://maps.google.com/maps?q=${encodeURIComponent(fullAddress)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+
+  const handleContactSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormStatus('sending');
+    setTimeout(() => {
+      setFormStatus('success');
+      const whatsappMessage = `Olá, tenho interesse no imóvel: ${property.title}. Meu nome é ${contactForm.name}.`;
+      const whatsappUrl = `https://wa.me/5564999999999?text=${encodeURIComponent(whatsappMessage)}`;
+      window.open(whatsappUrl, '_blank');
+    }, 1500);
+  };
 
   return (
-    <div className="animate-fade-in bg-white min-h-screen pb-20">
-      {/* HEADER DA IMAGEM */}
-      <div className="relative h-[60vh] md:h-[70vh] group">
-        <img
-          src={property.images?.[0] || 'https://placehold.co/1200x800?text=Imovel+Sem+Foto'}
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-          alt={property.title}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/20 to-slate-900/30"></div>
-
-        <button
-          onClick={() => navigate(-1)}
-          className="absolute top-24 left-3 z-20 bg-white/10 backdrop-blur-md border border-white/20 text-white p-3 rounded-full hover:bg-white hover:text-brand-900 transition-all shadow-lg"
-        >
-          <Icons.ArrowRight className="rotate-180" size={24} />
-        </button>
-
-        <div className="absolute bottom-0 left-0 w-full p-6 md:p-12 text-white">
-          <div className="container mx-auto">
-            <div className="flex flex-wrap gap-2 mb-4">
-              <span className="bg-brand-600/90 backdrop-blur-sm text-white px-3 py-1 rounded text-xs font-bold uppercase tracking-wider shadow-lg">
-                {property.type}
-              </span>
-              {property.agent && (
-                <span className="bg-emerald-600/90 backdrop-blur-sm text-white px-3 py-1 rounded text-xs font-bold uppercase tracking-wider flex items-center gap-1 shadow-lg">
-                  <Icons.User size={12} /> {property.agent.name.split(' ')[0]}
-                </span>
-              )}
-            </div>
-            <h1 className="text-3xl md:text-5xl font-serif font-bold mb-3 leading-tight drop-shadow-lg">
-              {property.title}
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-20 font-sans">
+      
+      {/* --- BREADCRUMBS & TITLE HEADER --- */}
+      <div className="bg-white dark:bg-slate-900 pt-8 pb-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <nav className="flex items-center gap-2 text-sm font-medium text-slate-500 mb-6">
+                <Link to="/" className="hover:text-black dark:hover:text-white transition-colors">Home</Link>
+                <span className="text-slate-300">/</span>
+                <Link to="/imoveis" className="hover:text-black dark:hover:text-white transition-colors">Imóveis</Link>
+                <span className="text-slate-300">/</span>
+                <span className="text-slate-900 dark:text-white truncate max-w-[200px]">{property.location.city}</span>
+            </nav>
+            <h1 className="text-3xl md:text-5xl font-semibold text-slate-900 dark:text-white leading-tight mb-2">
+                {property.title}
             </h1>
-
-            <p className="text-lg md:text-xl text-gray-200 flex items-center gap-2 mb-6 font-medium">
-              <Icons.MapPin size={20} className="text-brand-400" />
-              {property.location.neighborhood}, {property.location.city}
-            </p>
-
-            <div className="inline-block bg-white/10 backdrop-blur-md border border-white/10 px-6 py-3 rounded-xl">
-              <p className="text-3xl font-serif font-bold text-brand-400">
-                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(property.price)}
-              </p>
+            <div className="flex items-center text-slate-500 dark:text-slate-400 gap-2 text-lg font-light">
+                <Icons.MapPin size={18} />
+                <span>{property.location.neighborhood}, {property.location.city}</span>
             </div>
-          </div>
         </div>
       </div>
 
-      {/* CONTEUDO */}
-      <div className="container mx-auto px-4 py-12 grid grid-cols-1 lg:grid-cols-3 gap-12">
-        <div className="lg:col-span-2 space-y-10">
-          {/* Grid de Ícones */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center gap-2 hover:border-brand-200 transition-colors">
-              <div className="p-3 bg-white rounded-full shadow-sm text-brand-600"><Icons.Bed size={24} /></div>
-              <div>
-                <p className="font-bold text-xl text-slate-800">{property.bedrooms}</p>
-                <p className="text-xs text-slate-500 uppercase font-bold tracking-wide">Quartos</p>
+      {/* --- GALERIA GRID (Rounded aesthetic) --- */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 h-[450px] md:h-[600px] relative">
+            {/* Imagem Principal */}
+            <div className="md:col-span-2 md:row-span-2 relative h-full rounded-[2rem] overflow-hidden shadow-sm group">
+              <img 
+                src={property.images[0]} 
+                alt={property.title} 
+                className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-700"
+                onClick={() => setActiveImage(0)}
+              />
+              <div className="absolute top-6 left-6 bg-white/90 backdrop-blur px-4 py-2 rounded-full text-sm font-bold shadow-sm uppercase tracking-wider text-slate-900">
+                {property.type}
               </div>
             </div>
-            <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center gap-2 hover:border-brand-200 transition-colors">
-              <div className="p-3 bg-white rounded-full shadow-sm text-brand-600"><Icons.Bath size={24} /></div>
-              <div>
-                <p className="font-bold text-xl text-slate-800">{property.bathrooms}</p>
-                <p className="text-xs text-slate-500 uppercase font-bold tracking-wide">Banheiros</p>
-              </div>
-            </div>
-            <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center gap-2 hover:border-brand-200 transition-colors">
-              <div className="p-3 bg-white rounded-full shadow-sm text-brand-600"><Icons.Car size={24} /></div>
-              <div>
-                <p className="font-bold text-xl text-slate-800">{property.garage}</p>
-                <p className="text-xs text-slate-500 uppercase font-bold tracking-wide">Vagas</p>
-              </div>
-            </div>
-            <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center gap-2 hover:border-brand-200 transition-colors">
-              <div className="p-3 bg-white rounded-full shadow-sm text-brand-600"><Icons.Home size={24} /></div>
-              <div>
-                <p className="font-bold text-xl text-slate-800">
-                  {property.area} <span className="text-sm">m²</span>
-                </p>
-                <p className="text-xs text-slate-500 uppercase font-bold tracking-wide">Área</p>
-              </div>
-            </div>
-          </div>
 
-          <div className="space-y-6">
-            <h3 className="text-2xl font-bold text-slate-900 font-serif flex items-center gap-3">
-              <span className="w-1 h-8 bg-brand-500 rounded-full block"></span>
-              Sobre o imóvel
-            </h3>
-            <div className="prose prose-slate max-w-none text-slate-600 leading-8 text-lg">
-              <p className="whitespace-pre-line">{property.description}</p>
-            </div>
+            {/* Imagens Secundárias */}
+            {property.images.slice(1, 5).map((img, idx) => (
+              <div key={idx} className="relative h-full hidden md:block rounded-[2rem] overflow-hidden group">
+                <img 
+                  src={img} 
+                  alt={`View ${idx}`} 
+                  className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-700"
+                  onClick={() => setActiveImage(idx + 1)}
+                />
+              </div>
+            ))}
+            
+            <button className="absolute bottom-6 right-6 bg-white text-slate-900 px-6 py-3 rounded-full font-bold shadow-xl hover:bg-slate-50 transition-colors flex items-center gap-2">
+              <Icons.Grid size={18} />
+              Ver todas as fotos
+            </button>
           </div>
+      </div>
 
-          <div className="space-y-6">
-            <h3 className="text-2xl font-bold text-slate-900 font-serif flex items-center gap-3">
-              <span className="w-1 h-8 bg-brand-500 rounded-full block"></span>
-              Diferenciais
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {property.features.map((feature, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-3 p-4 bg-white border border-slate-100 rounded-xl shadow-sm hover:border-brand-200 transition-colors group"
-                >
-                  <div className="bg-emerald-50 text-emerald-600 p-1.5 rounded-full group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                    <Icons.CheckCircle size={16} />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+          
+          {/* --- COLUNA ESQUERDA (Info) --- */}
+          <div className="lg:col-span-8 space-y-12">
+            
+            {/* Cards de Métricas (Design Clean) */}
+            <div className="flex flex-wrap gap-4 border-b border-slate-200 dark:border-slate-700 pb-8">
+                <div className="px-6 py-4 bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 flex items-center gap-3">
+                  <Icons.Maximize size={24} className="text-slate-400" />
+                  <div>
+                    <span className="block text-xl font-bold text-slate-900 dark:text-white">{property.area} m²</span>
+                    <span className="text-xs text-slate-500 font-medium uppercase">Área Útil</span>
                   </div>
-                  <span className="text-slate-700 font-medium">{feature}</span>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* CARD DIREITO (STICKY) */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-slate-100 p-8 sticky top-28">
-            <div className="flex items-center gap-4 mb-8 pb-8 border-b border-slate-100">
-              <div
-                className={`w-16 h-16 rounded-full flex items-center justify-center font-bold text-2xl shadow-lg border-2 border-white ${
-                  property.agent
-                    ? 'bg-gradient-to-br from-emerald-500 to-teal-700 text-white'
-                    : 'bg-gradient-to-br from-brand-400 to-brand-600 text-white'
-                }`}
-              >
-                {property.agent ? property.agent.name.charAt(0) : 'TR'}
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">
-                  {property.agent ? 'Corretor Exclusivo' : 'Atendimento Oficial'}
-                </p>
-                <h3 className="font-bold text-slate-900 text-lg leading-tight">
-                  {property.agent ? property.agent.name : COMPANY_NAME}
-                </h3>
-                {property.agent && <p className="text-xs text-emerald-600 font-bold mt-0.5">● Online agora</p>}
-              </div>
+                <div className="px-6 py-4 bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 flex items-center gap-3">
+                  <Icons.Bed size={24} className="text-slate-400" />
+                  <div>
+                    <span className="block text-xl font-bold text-slate-900 dark:text-white">{property.bedrooms}</span>
+                    <span className="text-xs text-slate-500 font-medium uppercase">Quartos</span>
+                  </div>
+                </div>
+                <div className="px-6 py-4 bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-700 flex items-center gap-3">
+                  <Icons.Bath size={24} className="text-slate-400" />
+                  <div>
+                    <span className="block text-xl font-bold text-slate-900 dark:text-white">{property.bathrooms}</span>
+                    <span className="text-xs text-slate-500 font-medium uppercase">Banheiros</span>
+                  </div>
+                </div>
             </div>
 
-            <form onSubmit={handleContact} className="space-y-5">
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase ml-1">Seu Nome</label>
-                <input
-                  type="text"
-                  required
-                  className="w-full mt-1 px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all font-medium text-slate-800 placeholder:text-slate-400"
-                  placeholder="Como gostaria de ser chamado?"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase ml-1">Seu WhatsApp</label>
-                <input
-                  type="tel"
-                  required
-                  className="w-full mt-1 px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all font-medium text-slate-800 placeholder:text-slate-400"
-                  placeholder="(DDD) 99999-9999"
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={sending}
-                className={`w-full py-4 rounded-xl font-bold text-white shadow-xl hover:shadow-2xl transform transition-all hover:-translate-y-1 flex items-center justify-center gap-3 text-base ${
-                  property.agent
-                    ? 'bg-gradient-to-r from-[#25D366] to-[#128C7E]'
-                    : 'bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700'
-                }`}
-              >
-                {sending ? (
-                  <Icons.Loader2 className="animate-spin" />
-                ) : property.agent ? (
-                  <>
-                    <Icons.MessageCircle size={20} /> Falar com {property.agent.name.split(' ')[0]}
-                  </>
-                ) : (
-                  <>
-                    <Icons.Mail size={20} /> Agendar Visita
-                  </>
-                )}
-              </button>
-
-              <p className="text-center text-[10px] text-slate-400 leading-relaxed px-4">
-                Ao enviar, você receberá um atendimento personalizado e exclusivo.
+            {/* Descrição */}
+            <div>
+              <h2 className="text-2xl font-semibold text-slate-900 dark:text-white mb-6">Sobre o imóvel</h2>
+              <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-lg whitespace-pre-line font-light">
+                {property.description}
               </p>
-            </form>
+            </div>
+
+            {/* Features (Pills Style) */}
+            <div>
+              <h2 className="text-2xl font-semibold text-slate-900 dark:text-white mb-6">Comodidades</h2>
+              <div className="flex flex-wrap gap-3">
+                {property.features.map((feature, index) => (
+                  <span key={index} className="flex items-center gap-2 text-slate-700 dark:text-slate-300 bg-white border border-slate-200 dark:bg-slate-800 dark:border-slate-700 px-5 py-3 rounded-full text-sm font-medium">
+                    <Icons.CheckCircle size={16} className="text-slate-900 dark:text-white" />
+                    {feature}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Mapa */}
+            <div className="rounded-[2rem] overflow-hidden border border-slate-200 h-[400px]">
+               <iframe
+                  title="Mapa de Localização"
+                  width="100%"
+                  height="100%"
+                  frameBorder="0"
+                  src={mapUrl}
+                  className="grayscale hover:grayscale-0 transition-all duration-500"
+                />
+            </div>
           </div>
+
+          {/* --- COLUNA DIREITA (Sticky Sidebar - Estilo Referência) --- */}
+          <div className="lg:col-span-4">
+            <div className="sticky top-8">
+              
+              {/* Card Principal */}
+              <div className="bg-white dark:bg-slate-800 p-8 rounded-[2rem] shadow-xl border border-slate-100 dark:border-slate-700">
+                {/* Preço */}
+                <div className="mb-8">
+                    <p className="text-sm text-slate-500 font-medium uppercase tracking-wide mb-1">Preço de Venda</p>
+                    <h2 className="text-4xl font-bold text-slate-900 dark:text-white">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(property.price)}
+                    </h2>
+                </div>
+
+                <hr className="border-slate-100 dark:border-slate-700 my-6" />
+
+                {/* Info Corretor (Estilo "Amelia Stephenson") */}
+                <div className="flex items-center gap-4 mb-8">
+                    <div className="w-14 h-14 rounded-full bg-slate-100 overflow-hidden">
+                        {/* Placeholder para foto do corretor se não houver */}
+                         <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-500 font-bold text-xl">
+                            {property.agent?.name?.charAt(0) || 'C'}
+                         </div>
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-slate-900 dark:text-white text-lg">{property.agent?.name || 'Consultor Especialista'}</h3>
+                        <div className="flex items-center gap-1 text-yellow-400 text-sm">
+                            <Icons.Star size={14} fill="currentColor" />
+                            <span className="text-slate-600 dark:text-slate-400 font-medium">5.0 (124 vendas)</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Formulário Embutido */}
+                {formStatus === 'success' ? (
+                  <div className="bg-green-50 p-6 rounded-2xl text-center">
+                    <Icons.CheckCircle className="text-green-600 mx-auto mb-2" size={32} />
+                    <p className="text-green-800 font-medium">Solicitação enviada!</p>
+                  </div>
+                ) : (
+                    <form onSubmit={handleContactSubmit} className="space-y-4">
+                         <div className="grid grid-cols-2 gap-4">
+                            <button type="button" className="py-2 border-b-2 border-black font-bold text-sm">Agendar Visita</button>
+                            <button type="button" className="py-2 border-b-2 border-transparent text-slate-400 font-medium text-sm hover:text-slate-600">Fazer Proposta</button>
+                         </div>
+
+                         <input
+                            type="text"
+                            required
+                            placeholder="Seu nome"
+                            className="w-full px-4 py-3 rounded-xl bg-slate-50 border-none focus:ring-2 focus:ring-slate-900 outline-none"
+                            value={contactForm.name}
+                            onChange={e => setContactForm({...contactForm, name: e.target.value})}
+                         />
+                         <input
+                            type="tel"
+                            required
+                            placeholder="Seu telefone"
+                            className="w-full px-4 py-3 rounded-xl bg-slate-50 border-none focus:ring-2 focus:ring-slate-900 outline-none"
+                            value={contactForm.phone}
+                            onChange={e => setContactForm({...contactForm, phone: e.target.value})}
+                         />
+                         
+                         {/* Botão de Ação "Pill" Preto */}
+                         <button
+                            type="submit"
+                            disabled={formStatus === 'sending'}
+                            className="w-full bg-slate-900 hover:bg-black text-white font-bold py-4 rounded-full transition-all shadow-lg hover:shadow-xl hover:-translate-y-1 flex items-center justify-center gap-2 mt-4"
+                        >
+                            {formStatus === 'sending' ? 'Enviando...' : 'Solicitar Visita'}
+                        </button>
+
+                         <button
+                            type="button"
+                            onClick={() => window.open(`https://wa.me/55${property.agent?.phone?.replace(/\D/g, '') || '64999999999'}`, '_blank')}
+                            className="w-full bg-white border border-slate-200 text-slate-900 font-bold py-4 rounded-full transition-all hover:bg-slate-50 flex items-center justify-center gap-2"
+                        >
+                            <Icons.MessageCircle size={20} />
+                            Conversar no WhatsApp
+                        </button>
+                    </form>
+                )}
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

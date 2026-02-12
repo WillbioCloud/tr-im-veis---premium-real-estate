@@ -55,6 +55,17 @@ import {
   Send,
   List,
   Globe,
+  Map,
+  AlignLeft,
+  Maximize,
+  Minimize,
+  Heart,
+  Grid,
+  Share,
+  BedDouble,
+  ChevronDown,
+  Bookmark,
+  MoreHorizontal,
 } from 'lucide-react';
 
 export const Icons = {
@@ -117,4 +128,15 @@ export const Icons = {
   Send,
   List,
   Globe,
+  Map,
+  AlignLeft,
+  Maximize,
+  Minimize,
+  Heart,
+  Grid,
+  Share,
+  BedDouble,
+  ChevronDown,
+  Bookmark,
+  MoreHorizontal,
 };
