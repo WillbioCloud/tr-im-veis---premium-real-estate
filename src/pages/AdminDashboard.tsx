@@ -1,65 +1,144 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Icons } from '../components/Icons';
 import { useAuth } from '../contexts/AuthContext';
-import { TOOLTIPS } from '../constants/tooltips';
 import { LeadStatus } from '../types';
 
-// Função auxiliar para formatar dinheiro
 const formatBRL = (n: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(n || 0);
+
+const getLevelTitle = (xp: number) => {
+  if (xp >= 4000) return 'Corretor Elite';
+  if (xp >= 2500) return 'Corretor Sênior';
+  if (xp >= 1200) return 'Corretor Pleno';
+  return 'Corretor Júnior';
+};
+
+const getLevelProgress = (xp: number) => {
+  const checkpoints = [0, 1200, 2500, 4000, 6000];
+  const currentLevel = checkpoints.findLastIndex((point) => xp >= point);
+  const start = checkpoints[Math.max(currentLevel, 0)] ?? 0;
+  const end = checkpoints[Math.min(currentLevel + 1, checkpoints.length - 1)] ?? 6000;
+  const progress = Math.min(100, ((xp - start) / Math.max(1, end - start)) * 100);
+  return { progress, nextAt: end };
+};
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const isAdmin = user?.role === 'admin';
+
   const [loading, setLoading] = useState(true);
 
-  // Estado unificado para estatísticas
-  const [stats, setStats] = useState({
-    totalProperties: 0,
+  const [adminStats, setAdminStats] = useState({
     totalLeads: 0,
+    totalProperties: 0,
+    totalVgv: 0,
     activeDeals: 0,
-    conversionRate: 0
   });
 
-  const [recentLeads, setRecentLeads] = useState<any[]>([]);
+  const [corretorStats, setCorretorStats] = useState({
+    myPendingTasks: 0,
+    myHotLeads: 0,
+    myXp: 0,
+    myOpenLeads: 0,
+  });
+
+  const [hotLeads, setHotLeads] = useState<any[]>([]);
+  const [agenda, setAgenda] = useState<any[]>([]);
+  const [agentsPerformance, setAgentsPerformance] = useState<any[]>([]);
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [user?.id, isAdmin]);
 
   const fetchDashboardData = async () => {
+    if (!user?.id) return;
+
     try {
       setLoading(true);
 
-      // 1. Buscas Paralelas para Performance
-      const [propsResponse, leadsResponse, activeLeadsResponse] = await Promise.all([
-        supabase.from('properties').select('*', { count: 'exact', head: true }),
-        supabase.from('leads').select('*', { count: 'exact', head: true }),
-        supabase.from('leads').select('*', { count: 'exact', head: true })
-          .not('status', 'in', `(${LeadStatus.LOST},${LeadStatus.CLOSED})`) // Leads ativos
-      ]);
+      if (isAdmin) {
+        const [propertiesRes, leadsRes, activeDealsRes, hotLeadsRes, agentsRes] = await Promise.all([
+          supabase.from('properties').select('id, price, listing_type, agent_id'),
+          supabase.from('leads').select('id', { count: 'exact', head: true }),
+          supabase.from('leads').select('id', { count: 'exact', head: true }).not('status', 'in', `(${LeadStatus.LOST},${LeadStatus.CLOSED})`),
+          supabase
+            .from('leads')
+            .select('id, name, status, lead_score, created_at, property:properties(title)')
+            .order('lead_score', { ascending: false })
+            .limit(6),
+          supabase.from('profiles').select('id, name, role').eq('role', 'corretor'),
+        ]);
 
-      // 2. Busca Leads Recentes (Top 5)
-      const { data: recent } = await supabase
-        .from('leads')
-        .select(`
-          id, name, score, status, created_at,
-          property:properties(title)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(5);
+        const properties = propertiesRes.data || [];
+        const totalVgv = properties
+          .filter((property: any) => property.listing_type !== 'rent')
+          .reduce((acc: number, property: any) => acc + Number(property.price || 0), 0);
 
-      setStats({
-        totalProperties: propsResponse.count || 0,
-        totalLeads: leadsResponse.count || 0,
-        activeDeals: activeLeadsResponse.count || 0,
-        conversionRate: 12.5 // Simulação (pode ser calculado depois: fechados / total * 100)
-      });
+        const perfRows = (agentsRes.data || []).map((agent: any) => {
+          const agentProperties = properties.filter((property: any) => property.agent_id === agent.id).length;
+          return {
+            id: agent.id,
+            name: agent.name,
+            properties: agentProperties,
+          };
+        });
 
-      if (recent) setRecentLeads(recent);
+        const { data: leadsByAgent } = await supabase.from('leads').select('assigned_to, status');
+        const perf = perfRows.map((row: any) => {
+          const myLeads = (leadsByAgent || []).filter((lead: any) => lead.assigned_to === row.id);
+          const won = myLeads.filter((lead: any) => lead.status === LeadStatus.CLOSED).length;
+          return {
+            ...row,
+            leads: myLeads.length,
+            winRate: myLeads.length ? Math.round((won / myLeads.length) * 100) : 0,
+          };
+        });
 
+        setAdminStats({
+          totalProperties: properties.length,
+          totalLeads: leadsRes.count || 0,
+          activeDeals: activeDealsRes.count || 0,
+          totalVgv,
+        });
+        setHotLeads(hotLeadsRes.data || []);
+        setAgentsPerformance(perf);
+      } else {
+        const [profileRes, hotLeadsRes, tasksRes, openLeadsRes] = await Promise.all([
+          supabase.from('profiles').select('xp_points').eq('id', user.id).maybeSingle(),
+          supabase
+            .from('leads')
+            .select('id, name, status, lead_score, property:properties(title)')
+            .eq('assigned_to', user.id)
+            .order('lead_score', { ascending: false })
+            .limit(5),
+          supabase
+            .from('tasks')
+            .select('id, title, due_date, completed, type')
+            .eq('user_id', user.id)
+            .eq('completed', false)
+            .order('due_date', { ascending: true })
+            .limit(6),
+          supabase
+            .from('leads')
+            .select('id', { count: 'exact', head: true })
+            .eq('assigned_to', user.id)
+            .not('status', 'in', `(${LeadStatus.LOST},${LeadStatus.CLOSED})`),
+        ]);
+
+        const xp = Number(profileRes.data?.xp_points || 0);
+
+        setCorretorStats({
+          myXp: xp,
+          myHotLeads: (hotLeadsRes.data || []).filter((lead: any) => Number(lead.lead_score || 0) >= 12).length,
+          myPendingTasks: (tasksRes.data || []).length,
+          myOpenLeads: openLeadsRes.count || 0,
+        });
+        setHotLeads(hotLeadsRes.data || []);
+        setAgenda(tasksRes.data || []);
+      }
     } catch (error) {
       console.error('Erro ao carregar dashboard:', error);
     } finally {
@@ -67,163 +146,157 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const xpMeta = useMemo(() => getLevelProgress(corretorStats.myXp), [corretorStats.myXp]);
+
   return (
     <div className="space-y-8 animate-fade-in pb-20">
-      
-      {/* === CABEÇALHO === */}
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-3">
         <div>
           <h1 className="text-3xl font-serif font-bold text-slate-800">
             Olá, {user?.name?.split(' ')[0] || 'Gestor'}
           </h1>
-          <p className="text-slate-500 mt-1">Aqui está o panorama da sua imobiliária hoje.</p>
+          <p className="text-slate-500 mt-1">
+            {isAdmin
+              ? 'Visão executiva completa da operação imobiliária.'
+              : 'Seu cockpit de produtividade comercial e atendimento.'}
+          </p>
         </div>
         <div className="text-sm text-slate-400 font-medium bg-white px-3 py-1 rounded-lg border border-slate-100 shadow-sm">
           {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
         </div>
       </div>
 
-      {/* === KPIS (CARDS DE MÉTRICAS) === */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Imóveis */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all">
-          <div className="flex justify-between items-start mb-4 relative z-10">
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl group-hover:scale-110 transition-transform">
-              <Icons.Home size={24} />
+      {isAdmin ? (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <p className="text-sm text-slate-500">VGV Total</p>
+              <h3 className="text-3xl font-bold text-slate-900 mt-1">{loading ? '...' : formatBRL(adminStats.totalVgv)}</h3>
             </div>
-            <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">+2 novos</span>
-          </div>
-          <h3 className="text-3xl font-bold text-slate-800 relative z-10">{loading ? '...' : stats.totalProperties}</h3>
-          <p className="text-sm text-slate-500 relative z-10">Imóveis Ativos</p>
-          <Icons.Home className="absolute -bottom-4 -right-4 text-slate-50 w-32 h-32 rotate-[-15deg] group-hover:rotate-0 transition-transform duration-500" />
-        </div>
-
-        {/* Leads Totais */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all">
-          <div className="flex justify-between items-start mb-4 relative z-10">
-            <div className="p-3 bg-amber-50 text-amber-600 rounded-xl group-hover:scale-110 transition-transform">
-              <Icons.Users size={24} />
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <p className="text-sm text-slate-500">Leads Totais</p>
+              <h3 className="text-3xl font-bold text-slate-900 mt-1">{loading ? '...' : adminStats.totalLeads}</h3>
             </div>
-            <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">+12%</span>
-          </div>
-          <h3 className="text-3xl font-bold text-slate-800 relative z-10">{loading ? '...' : stats.totalLeads}</h3>
-          <p className="text-sm text-slate-500 relative z-10">Total de Leads</p>
-          <Icons.Users className="absolute -bottom-4 -right-4 text-slate-50 w-32 h-32 rotate-[-15deg] group-hover:rotate-0 transition-transform duration-500" />
-        </div>
-
-        {/* Negócios Ativos */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all">
-          <div className="flex justify-between items-start mb-4 relative z-10">
-            <div className="p-3 bg-purple-50 text-purple-600 rounded-xl group-hover:scale-110 transition-transform">
-              <Icons.DollarSign size={24} />
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <p className="text-sm text-slate-500">Imóveis Cadastrados</p>
+              <h3 className="text-3xl font-bold text-slate-900 mt-1">{loading ? '...' : adminStats.totalProperties}</h3>
             </div>
-            <span className="text-xs font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-lg">Em andamento</span>
-          </div>
-          <h3 className="text-3xl font-bold text-slate-800 relative z-10">{loading ? '...' : stats.activeDeals}</h3>
-          <p className="text-sm text-slate-500 relative z-10">Negociações Abertas</p>
-          <Icons.DollarSign className="absolute -bottom-4 -right-4 text-slate-50 w-32 h-32 rotate-[-15deg] group-hover:rotate-0 transition-transform duration-500" />
-        </div>
-
-        {/* Taxa de Conversão */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all">
-          <div className="flex justify-between items-start mb-4 relative z-10">
-            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl group-hover:scale-110 transition-transform">
-              <Icons.TrendingUp size={24} />
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <p className="text-sm text-slate-500">Negócios em Andamento</p>
+              <h3 className="text-3xl font-bold text-slate-900 mt-1">{loading ? '...' : adminStats.activeDeals}</h3>
             </div>
-            <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-lg">+2.1%</span>
-          </div>
-          <h3 className="text-3xl font-bold text-slate-800 relative z-10">{loading ? '...' : stats.conversionRate}%</h3>
-          <p className="text-sm text-slate-500 relative z-10">Taxa de Conversão</p>
-          <Icons.TrendingUp className="absolute -bottom-4 -right-4 text-slate-50 w-32 h-32 rotate-[-15deg] group-hover:rotate-0 transition-transform duration-500" />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* === COLUNA ESQUERDA: LEADS RECENTES === */}
-        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-              <Icons.Clock size={20} className="text-brand-600" />
-              Últimos Leads
-            </h3>
-            <button 
-              onClick={() => navigate('/admin/leads')}
-              className="text-sm text-brand-600 font-bold hover:underline"
-            >
-              Ver todos
-            </button>
           </div>
 
-          <div className="space-y-4">
-            {recentLeads.length === 0 ? (
-              <p className="text-slate-400 text-center py-8">Nenhum lead recente.</p>
-            ) : (
-              recentLeads.map(lead => (
-                <div key={lead.id} className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-brand-200 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm ${
-                      lead.score > 70 ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gradient-to-br from-slate-400 to-slate-500'
-                    }`}>
-                      {lead.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-800">{lead.name}</p>
-                      <p className="text-xs text-slate-500 truncate max-w-[200px]">
-                        {lead.property?.title || 'Interesse Geral'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className={`inline-block px-2 py-1 rounded text-[10px] font-bold uppercase mb-1 ${
-                      lead.status === 'Novo' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'
-                    }`}>
-                      {lead.status}
-                    </span>
-                    <p className="text-xs font-bold text-brand-600">{lead.score} pts</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* === COLUNA DIREITA: EXPLICAÇÃO DO SCORE (PREMIUM) === */}
-        <div className="lg:col-span-1 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl shadow-xl text-white p-8 relative overflow-hidden flex flex-col justify-center">
-          {/* Elemento Decorativo de Fundo */}
-          <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-            <Icons.Activity size={180} />
-          </div>
-          
-          <h3 className="font-serif font-bold text-2xl mb-3 flex items-center gap-2 relative z-10">
-            <Icons.Info className="text-brand-400" />
-            {TOOLTIPS.dashboard.scoreHelp.title}
-          </h3>
-          
-          <p className="text-slate-300 text-sm mb-8 leading-relaxed relative z-10">
-            {TOOLTIPS.dashboard.scoreHelp.description}
-          </p>
-
-          <div className="space-y-4 relative z-10">
-            {TOOLTIPS.dashboard.scoreHelp.criteria.map((criteria, index) => (
-              <div 
-                key={index} 
-                className="flex items-center gap-3 bg-white/5 p-3 rounded-xl backdrop-blur-md border border-white/10 hover:bg-white/10 transition-colors"
-              >
-                <div className="w-2 h-2 rounded-full bg-brand-400 shadow-[0_0_10px_rgba(250,204,21,0.6)]"></div>
-                <span className="text-sm font-medium text-slate-200">{criteria}</span>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-slate-800">Desempenho dos Corretores</h3>
+                <button onClick={() => navigate('/admin/leads')} className="text-sm font-bold text-brand-700 hover:underline">Gerenciar Leads</button>
               </div>
-            ))}
+
+              <div className="space-y-3">
+                {agentsPerformance.map((agent) => (
+                  <div key={agent.id} className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-slate-800">{agent.name}</p>
+                      <p className="text-xs text-slate-500">{agent.properties} imóveis • {agent.leads} leads</p>
+                    </div>
+                    <span className="text-sm font-bold text-emerald-600">Win rate: {agent.winRate}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <Icons.Flame size={18} className="text-orange-500" />
+                Leads Quentes
+              </h3>
+              <div className="space-y-3">
+                {hotLeads.map((lead) => (
+                  <div key={lead.id} className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <p className="font-semibold text-slate-800">{lead.name}</p>
+                    <p className="text-xs text-slate-500 truncate">{lead.property?.title || 'Interesse geral'}</p>
+                    <p className="text-xs font-bold text-orange-600 mt-1">Score: {lead.lead_score || 0}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <p className="text-sm text-slate-500">Leads Abertos</p>
+              <h3 className="text-3xl font-bold text-slate-900 mt-1">{loading ? '...' : corretorStats.myOpenLeads}</h3>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <p className="text-sm text-slate-500">Leads Quentes</p>
+              <h3 className="text-3xl font-bold text-slate-900 mt-1">{loading ? '...' : corretorStats.myHotLeads}</h3>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <p className="text-sm text-slate-500">Tarefas Pendentes</p>
+              <h3 className="text-3xl font-bold text-slate-900 mt-1">{loading ? '...' : corretorStats.myPendingTasks}</h3>
+            </div>
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <p className="text-sm text-slate-500">XP Atual</p>
+              <h3 className="text-3xl font-bold text-slate-900 mt-1">{loading ? '...' : corretorStats.myXp}</h3>
+            </div>
           </div>
 
-          <div className="mt-8 pt-6 border-t border-white/10 text-center relative z-10">
-            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">
-              Inteligência Artificial TR Imóveis
-            </p>
+          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-6 text-white">
+            <div className="flex items-center justify-between gap-4 mb-3">
+              <div>
+                <p className="text-slate-300 text-sm">Nível atual</p>
+                <h3 className="text-2xl font-bold">{getLevelTitle(corretorStats.myXp)}</h3>
+              </div>
+              <Icons.TrendingUp className="text-brand-400" />
+            </div>
+            <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-amber-400 to-yellow-300" style={{ width: `${xpMeta.progress}%` }} />
+            </div>
+            <p className="text-xs text-slate-300 mt-2">{corretorStats.myXp} XP • Próximo nível em {xpMeta.nextAt} XP</p>
           </div>
-        </div>
 
-      </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-slate-800">Minha Agenda</h3>
+                <button onClick={() => navigate('/admin/tarefas')} className="text-sm font-bold text-brand-700 hover:underline">Ver tarefas</button>
+              </div>
+              <div className="space-y-3">
+                {agenda.length === 0 ? (
+                  <p className="text-slate-400 text-sm">Nenhuma tarefa pendente.</p>
+                ) : (
+                  agenda.map((task) => (
+                    <div key={task.id} className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                      <p className="font-semibold text-slate-800">{task.title}</p>
+                      <p className="text-xs text-slate-500">{new Date(task.due_date).toLocaleString('pt-BR')}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <Icons.Flame size={18} className="text-orange-500" />
+                Meus Leads Quentes
+              </h3>
+              <div className="space-y-3">
+                {hotLeads.map((lead) => (
+                  <div key={lead.id} className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <p className="font-semibold text-slate-800">{lead.name}</p>
+                    <p className="text-xs text-slate-500 truncate">{lead.property?.title || 'Interesse geral'}</p>
+                    <p className="text-xs font-bold text-orange-600 mt-1">Score: {lead.lead_score || 0}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

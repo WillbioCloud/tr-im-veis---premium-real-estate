@@ -1,5 +1,7 @@
 // src/types.ts
 
+export type ListingType = 'sale' | 'rent';
+
 export enum PropertyType {
   APARTMENT = 'Apartamento',
   HOUSE = 'Casa',
@@ -25,28 +27,38 @@ export interface Property {
   description: string;
   price: number;
   type: PropertyType;
+  listing_type?: ListingType;
+
+  // Campos condicionais de venda/aluguel
+  rent_package_price?: number;
+  down_payment?: number;
+  financing_available?: boolean;
+
   bedrooms: number;
   bathrooms: number;
   area: number;
   garage: number;
-  
+
   // Estrutura Visual (Frontend)
   location: {
     city: string;
     neighborhood: string;
     state: string;
     address?: string;
+    zip_code?: string;
   };
 
   // Estrutura Plana (Banco de Dados) - Opcionais para mapeamento
   city?: string;
   neighborhood?: string;
   state?: string;
+  address?: string;
+  zip_code?: string;
 
   features: string[];
   images: string[];
   featured?: boolean;
-  
+
   // Financeiro e Admin
   iptu?: number;
   condominium?: number;
@@ -55,6 +67,10 @@ export interface Property {
   owner_name?: string;
   owner_phone?: string;
   created_at?: string;
+
+  // SEO
+  seo_title?: string;
+  seo_description?: string;
 
   // NOVO: Vinculo com Corretor
   agent_id?: string;
@@ -65,8 +81,6 @@ export interface Property {
   };
 }
 
-// === NOVOS TIPOS PARA O CRM ===
-
 export interface Task {
   id: string;
   title: string;
@@ -75,6 +89,8 @@ export interface Task {
   completed: boolean;
   type: 'call' | 'meeting' | 'email' | 'visit' | 'whatsapp' | 'other';
   lead_id: string;
+  user_id: string;
+  created_at?: string;
 }
 
 export interface TimelineEvent {
@@ -96,8 +112,14 @@ export interface Lead {
   propertyId?: string;
   createdAt: string;
   source: string;
-  assigned_to?: string; // ID do corretor dono do lead
-  
+  assigned_to?: string;
+
+  // Lead scoring de interesse
+  lead_score?: number;
+  score_visit?: number;
+  score_favorite?: number;
+  score_whatsapp?: number;
+
   // JOIN: Dados expandidos do Imóvel e do Dono do Imóvel
   property?: {
     title: string;
@@ -111,14 +133,14 @@ export interface Lead {
   assignee?: {
     name: string;
   };
-  
+
   // Campos CRM Premium
-  value?: number;          // Valor potencial
-  probability?: number;    // 0 a 100%
-  loss_reason?: string;    // Se status for LOST
-  last_interaction?: string; // Para SLA
+  value?: number;
+  probability?: number;
+  loss_reason?: string;
+  last_interaction?: string;
   expected_close_date?: string;
-  score: number; // Score calculado
+  score: number;
 }
 
 export interface FilterState {
@@ -127,6 +149,7 @@ export interface FilterState {
   maxPrice: number | '';
   bedrooms: number | '';
   type: string;
+  listingType?: ListingType | '';
 }
 
 export interface Profile {
@@ -136,12 +159,19 @@ export interface Profile {
   active: boolean;
   role?: string;
   phone?: string;
+
+  // Gamificação do corretor
+  xp_points?: number;
+  level?: number;
+  level_title?: string;
 }
 
 export interface Template {
   id: string;
   title: string;
   content: string;
+  user_id: string;
+  created_at?: string;
 }
 
 export interface Database {
