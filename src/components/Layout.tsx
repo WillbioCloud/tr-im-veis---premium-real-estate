@@ -114,14 +114,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <ul className="space-y-2 text-sm">
               <li><Link to="/imoveis" className="hover:text-amber-400">Comprar Imóvel</Link></li>
               <li><Link to="/bairros/jardins" className="hover:text-amber-400">Imóveis nos Jardins</Link></li>
-              <li><Link to="/bairros/alphaville" className="hover:text-amber-400">Casas em Alphaville</Link></li>
+              <li><Link to="https://wa.me/5564996234208?text=Gostaria%20de%20anunciar%20meu%20im%C3%B3vel,%20poderia%20me%20passar%20mais%20informa%C3%A7%C3%B5es?" target="_blank" className="flex items-center gap-1 hover:text-amber-400 transition-colors">Venda seu Imóvel Conosco</Link></li>
             </ul>
           </div>
           <div>
             <h4 className="text-white font-bold mb-4">Contato</h4>
             <ul className="space-y-2 text-sm">
-              <li className="flex items-center gap-2"><Icons.MapPin size={16}/> Av. Paulista, 1000 - SP</li>
-              <li className="flex items-center gap-2"><Icons.Phone size={16}/> (11) 3333-4444</li>
+              <li className="flex items-center gap-2"><Icons.MapPin size={16}/> R. 03, QD 08 - LT 08 - itajá - Caldas Novas - GO</li>
+              <li className="flex items-center gap-2"><Icons.Phone size={16}/> (64) 99623-4208</li>
               <li className="flex items-center gap-2"><Icons.Mail size={16}/> contato@trimoveis.com</li>
             </ul>
           </div>
