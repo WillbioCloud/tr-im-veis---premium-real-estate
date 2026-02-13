@@ -121,7 +121,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <h4 className="text-white font-bold mb-4">Contato</h4>
             <ul className="space-y-2 text-sm">
               <li className="flex items-center gap-2"><Icons.MapPin size={16}/> R. 03, QD 08 - LT 08 - itajá - Caldas Novas - GO</li>
-              <li className="flex items-center gap-2"><Icons.Phone size={16}/> (64) 99623-4208</li>
+              <li className="flex items-center gap-2"><Icons.Phone size={16}/> (64) 99623-# Changes to be committed:
+#	modified:   src/components/Layout.tsx: Ajuste no endereço, telefone e logo para refletir a nova identidade visual da empresa.
+#4208</li>
               <li className="flex items-center gap-2"><Icons.Mail size={16}/> contato@trimoveis.com</li>
             </ul>
           </div>
