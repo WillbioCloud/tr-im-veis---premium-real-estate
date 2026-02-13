@@ -6,6 +6,16 @@ import { useProperties } from '../hooks/useProperties';
 import Loading from '../components/Loading';
 import { ListingType } from '../types';
 
+const partnerLogos = [
+  '/parcerias/LOGO-CIDADE-DAS-FLORES.webp',
+  '/parcerias/LOGO-CIDADE-INTELIGENTE.webp',
+  '/parcerias/LOGO-CIDADE-VERDE.webp',
+  '/parcerias/Logo-fbz.png',
+  '/parcerias/LOGO-LAGO-SUL.webp',
+  '/parcerias/LOGO-RESERVA-DA-MATA.webp',
+  '/parcerias/logo-bn.png',
+];
+
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const [listingMode, setListingMode] = useState<ListingType>('sale');
@@ -41,7 +51,25 @@ const Home: React.FC = () => {
   const featuredProperties = properties.filter(p => p.featured).slice(0, 3);
 
   return (
-    <div className="animate-fade-in bg-slate-50 dark:bg-dark-bg min-h-screen font-sans">
+    <div className="animate-fade-in bg-slate-50 dark:bg-dark-bg min-h-screen font-sans overflow-x-hidden">
+      {/* Estilos da Animação do Carrossel */}
+      <style>
+        {`
+          @keyframes scroll-marquee {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+          }
+          .animate-marquee {
+            display: flex;
+            width: max-content;
+            animation: scroll-marquee 35s linear infinite;
+          }
+          .animate-marquee:hover {
+            animation-play-state: paused;
+          }
+        `}
+      </style>
+
       {/* Hero Section Premium */}
       <section className="relative h-[85vh] w-full p-4 md:p-6 pb-0">
         <div className="relative w-full h-full rounded-[2.5rem] overflow-hidden shadow-2xl">
@@ -60,6 +88,7 @@ const Home: React.FC = () => {
 
             {/* Conteúdo Central */}
             <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-4">
+              <img src={"/img/Logo.png"} alt="Tr Imóveis" className="h-11 w-auto mb-6" />
             <h1 className="text-3xl sm:text-4xl md:text-7xl font-semibold tracking-tight text-white mb-4 md:mb-6 drop-shadow-lg">
                 Imóveis para viver <br/> e investir
             </h1>
@@ -202,23 +231,24 @@ const Home: React.FC = () => {
              
              <div onClick={() => navigate('/imoveis?type=Apartamento')} className="relative rounded-[2.5rem] overflow-hidden cursor-pointer group">
                <img src="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Apartamentos" />
-               <div className="absolute inset-0 bg-black/10 group-hover:bg-black/0 transition-colors"></div>
-               <div className="absolute bottom-6 left-6">
-                  <span className="bg-white/90 backdrop-blur px-4 py-2 rounded-full text-sm font-bold text-slate-900">Apartamentos</span>
+               <div className="absolute bottom-0 left-0 p-8 w-full bg-gradient-to-t from-black/60 to-transparent">
+                  <h3 className="text-white text-3xl font-semibold">Apartamentos</h3>
+                  <p className="text-white/80 mt-2 opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-4 group-hover:translate-y-0">Design e arquitetura contemporânea</p>
                </div>
              </div>
 
              <div onClick={() => navigate('/imoveis?type=Cobertura')} className="relative rounded-[2.5rem] overflow-hidden cursor-pointer group">
                <img src="https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Coberturas" />
-               <div className="absolute bottom-6 left-6">
-                  <span className="bg-white/90 backdrop-blur px-4 py-2 rounded-full text-sm font-bold text-slate-900">Coberturas</span>
+               <div className="absolute bottom-0 left-0 p-8 w-full bg-gradient-to-t from-black/60 to-transparent">
+                  <h3 className="text-white text-3xl font-semibold">Coberturas</h3>
+                  <p className="text-white/80 mt-2 opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-4 group-hover:translate-y-0">Design e arquitetura contemporânea</p>
                </div>
              </div>
 
-             <div onClick={() => navigate('/imoveis?city=Jardins')} className="md:col-span-2 relative rounded-[2.5rem] overflow-hidden cursor-pointer group">
+             <div onClick={() => navigate('/imoveis?type=Terreno')} className="md:col-span-2 relative rounded-[2.5rem] overflow-hidden cursor-pointer group">
                <img src="https://images.unsplash.com/photo-1449844908441-8829872d2607?auto=format&fit=crop&w=800&q=80" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Bairros" />
                <div className="absolute bottom-0 left-0 p-8 w-full bg-gradient-to-t from-black/60 to-transparent">
-                  <h3 className="text-white text-2xl font-semibold">Bairros Nobres</h3>
+                  <h3 className="text-white text-2xl font-semibold">Lotes</h3>
                </div>
              </div>
           </div>
@@ -255,8 +285,45 @@ const Home: React.FC = () => {
           )}
         </div>
       </section>
-    </div>
-  );
+
+{/* NOVO: Seção de Parcerias (Carrossel Animado) */}
+        <section className="py-16 bg-white dark:bg-dark-card border-t border-slate-100 dark:border-dark-border overflow-hidden">
+          <div className="container mx-auto px-6 mb-10 text-center">
+            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">Nossos Parceiros</h2>
+            <p className="text-slate-500 mt-2 text-lg">Trabalhamos em conjunto com marcas e empresas de excelência.</p>
+          </div>
+
+          <div className="relative w-full flex overflow-hidden">
+            {/* Sombras laterais para dar um efeito de fade sutil no scroll */}
+            <div className="absolute top-0 left-0 w-16 md:w-32 h-full bg-gradient-to-r from-white dark:from-dark-card to-transparent z-10"></div>
+            <div className="absolute top-0 right-0 w-16 md:w-32 h-full bg-gradient-to-l from-white dark:from-dark-card to-transparent z-10"></div>
+
+            {/* O container flex com a animação marquee (duplicado para loop infinito) */}
+            <div className="animate-marquee flex items-center gap-16 md:gap-32 px-8">
+              {/* Primeira lista de logos */}
+              {partnerLogos.map((logoUrl, idx) => (
+                <img 
+                  key={`partner-1-${idx}`} 
+                  src={logoUrl} 
+                  alt={`Parceiro ${idx + 1}`} 
+                  className="h-12 md:h-16 w-auto object-contain grayscale hover:grayscale-0 opacity-50 hover:opacity-100 transition-all duration-300 cursor-pointer"
+                />
+              ))}
+              
+              {/* Segunda lista de logos idêntica (Cria a ilusão de loop infinito) */}
+              {partnerLogos.map((logoUrl, idx) => (
+                <img 
+                  key={`partner-2-${idx}`} 
+                  src={logoUrl} 
+                  alt={`Parceiro ${idx + 1}`} 
+                  className="h-12 md:h-16 w-auto object-contain grayscale hover:grayscale-0 opacity-50 hover:opacity-100 transition-all duration-300 cursor-pointer"
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      </div>
+    );
 };
 
 export default Home;

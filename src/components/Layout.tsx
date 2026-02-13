@@ -5,12 +5,22 @@ import { COMPANY_NAME } from '../constants';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // AQUI ESTÁ A LÓGICA QUE FALTAVA:
+  const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
 
   // === CORREÇÃO DO TEMA ===
   // Força o site público a ser sempre Claro, ignorando a escolha do Admin
   useEffect(() => {
     document.documentElement.classList.remove('dark');
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   // Simple check to hide public layout elements if needed, 
@@ -36,8 +46,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <Link to="/" className="text-2xl font-serif font-bold tracking-tight text-slate-900">
-            {COMPANY_NAME}
+          {/* Logo Dinâmica */}
+          <Link to="/" className="flex items-center gap-2 group">
+            <img
+              src={isScrolled ? "/img/Logo.png" : "/img/Logo-horizontal.png"}
+              alt="Tr Imóveis"
+              className="h-10 w-auto object-contain transition-all duration-300"
+            />
           </Link>
 
           {/* Desktop Nav */}
@@ -83,8 +98,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <footer className="bg-slate-900 text-gray-300 py-12">
         <div className="container mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <h3 className="text-2xl font-serif font-bold text-white mb-4">{COMPANY_NAME}</h3>
-            <p className="text-sm leading-relaxed">
+            <Link to="/" className="flex items-center gap-2 group">
+            <img
+              src={"/img/Logo-branca.png"}
+              alt="Tr Imóveis"
+              className="h-11 w-auto object-contain transition-all duration-300"
+            />
+          </Link>
+            <p className="text-sm leading-relaxed mb-4 mt-5">
               Especialistas em imóveis de alto padrão. Encontramos o lar perfeito para sua história.
             </p>
           </div>

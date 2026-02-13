@@ -11,7 +11,7 @@ const PropertyDetail: React.FC = () => {
   const { properties, loading } = useProperties();
   const [property, setProperty] = useState<Property | null>(null);
   
-  // Estados do formulário de contato
+  // --- Estados do formulário de contato ---
   const [contactForm, setContactForm] = useState({
     name: '',
     email: '',
@@ -19,6 +19,10 @@ const PropertyDetail: React.FC = () => {
     message: 'Olá, gostaria de agendar uma visita a este imóvel.'
   });
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'success'>('idle');
+
+  // --- Estados da Galeria (Lightbox) ---
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   useEffect(() => {
     if (properties.length > 0 && slug) {
@@ -28,6 +32,18 @@ const PropertyDetail: React.FC = () => {
       }
     }
   }, [properties, slug]);
+
+  // --- Lógica de Navegação da Galeria e Teclado ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isGalleryOpen || !property) return;
+      if (e.key === 'Escape') closeGallery();
+      if (e.key === 'ArrowRight') nextImage();
+      if (e.key === 'ArrowLeft') prevImage();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isGalleryOpen, currentImageIndex, property]);
 
   if (loading) return <Loading />;
   
@@ -44,8 +60,31 @@ const PropertyDetail: React.FC = () => {
 
   if (!property) return null;
 
+  const isRent = property.listing_type === 'rent';
   const fullAddress = `${property.location.address || ''}, ${property.location.neighborhood}, ${property.location.city} - ${property.location.state}`;
   const mapUrl = `https://maps.google.com/maps?q=${encodeURIComponent(fullAddress)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+
+  // Funções da Galeria
+  const openGallery = (index: number) => {
+    setCurrentImageIndex(index);
+    setIsGalleryOpen(true);
+    document.body.style.overflow = 'hidden'; // Evita scroll da página no fundo
+  };
+
+  const closeGallery = () => {
+    setIsGalleryOpen(false);
+    document.body.style.overflow = 'auto'; // Restaura scroll da página
+  };
+
+  const nextImage = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setCurrentImageIndex((prev) => (prev === property.images.length - 1 ? 0 : prev + 1));
+  };
+
+  const prevImage = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setCurrentImageIndex((prev) => (prev === 0 ? property.images.length - 1 : prev - 1));
+  };
 
   const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +92,7 @@ const PropertyDetail: React.FC = () => {
     setTimeout(() => {
       setFormStatus('success');
       const whatsappMessage = `Olá, tenho interesse no imóvel: ${property.title}. Meu nome é ${contactForm.name}.`;
-      const whatsappUrl = `https://wa.me/5564999999999?text=${encodeURIComponent(whatsappMessage)}`;
+      const whatsappUrl = `https://wa.me/55${property.agent?.phone?.replace(/\D/g, '') || '64999999999'}?text=${encodeURIComponent(whatsappMessage)}`;
       window.open(whatsappUrl, '_blank');
     }, 1500);
   };
@@ -61,9 +100,93 @@ const PropertyDetail: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-20 font-sans">
       
+      {/* =========================================
+          MODAL DA GALERIA (LIGHTBOX)
+      ========================================= */}
+      {isGalleryOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col animate-fade-in touch-none">
+          {/* Top Navbar */}
+          <div className="flex items-center justify-between p-4 md:p-6 text-white absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
+            <span className="font-bold tracking-widest text-sm uppercase pointer-events-auto bg-black/40 px-4 py-2 rounded-full backdrop-blur-sm border border-white/10">
+              {currentImageIndex + 1} / {property.images.length}
+            </span>
+            <button 
+              onClick={closeGallery} 
+              className="p-3 hover:bg-white/20 rounded-full transition-all pointer-events-auto backdrop-blur-sm"
+              aria-label="Fechar Galeria"
+            >
+              <Icons.X size={28} />
+            </button>
+          </div>
+
+          {/* Área Principal da Imagem */}
+          <div className="flex-1 relative flex items-center justify-center w-full h-full" onClick={closeGallery}>
+            {/* Botão Voltar (Oculto se houver apenas 1 foto) */}
+            {property.images.length > 1 && (
+              <button 
+                onClick={prevImage} 
+                className="absolute left-2 md:left-8 p-3 md:p-4 bg-black/50 hover:bg-black/80 border border-white/10 text-white rounded-full backdrop-blur transition-all z-10"
+              >
+                <Icons.ArrowLeft size={24} /> 
+              </button>
+            )}
+
+            <img 
+              src={property.images[currentImageIndex]} 
+              alt={`Foto ${currentImageIndex + 1}`} 
+              className="max-h-full max-w-full object-contain select-none transition-transform duration-300"
+              onClick={(e) => e.stopPropagation()} // Impede fechar ao clicar na foto
+            />
+
+            {/* Botão Avançar */}
+            {property.images.length > 1 && (
+              <button 
+                onClick={nextImage} 
+                className="absolute right-2 md:right-8 p-3 md:p-4 bg-black/50 hover:bg-black/80 border border-white/10 text-white rounded-full backdrop-blur transition-all z-10"
+              >
+                <Icons.ArrowRight size={24} />
+              </button>
+            )}
+          </div>
+
+          {/* Miniaturas (Carrossel Inferior para Mobile e Desktop) */}
+          {property.images.length > 1 && (
+            <div className="p-4 md:p-6 bg-black/50 backdrop-blur-md z-20">
+              <div className="flex gap-3 overflow-x-auto snap-x pb-2 justify-start md:justify-center [&::-webkit-scrollbar]:hidden">
+                {property.images.map((img, idx) => (
+                  <img 
+                    key={idx}
+                    src={img}
+                    alt={`Miniatura ${idx + 1}`}
+                    className={`h-16 md:h-20 w-24 md:w-32 object-cover cursor-pointer rounded-xl snap-center transition-all duration-300 ${
+                      idx === currentImageIndex 
+                        ? 'border-2 border-white opacity-100 scale-105 shadow-[0_0_15px_rgba(255,255,255,0.3)]' 
+                        : 'opacity-40 hover:opacity-100 border border-transparent'
+                    }`}
+                    onClick={() => setCurrentImageIndex(idx)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {/* ========================================= */}
+
+
       {/* --- BREADCRUMBS & TITLE HEADER --- */}
       <div className="bg-white dark:bg-slate-900 pt-8 pb-4">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            
+            {/* NOVO: Botão Voltar Dinâmico */}
+            <button 
+              onClick={() => navigate(-1)} 
+              className="flex items-center gap-2 text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-brand-400 transition-colors font-semibold mb-6 group w-fit"
+            >
+              <Icons.ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+              Voltar
+            </button>
+
             <nav className="flex items-center gap-2 text-sm font-medium text-slate-500 mb-6">
                 <Link to="/" className="hover:text-black dark:hover:text-white transition-colors">Home</Link>
                 <span className="text-slate-300">/</span>
@@ -85,29 +208,49 @@ const PropertyDetail: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 h-[300px] md:h-[600px] relative">
             {/* Imagem Principal */}
-            <div className="md:col-span-2 md:row-span-2 relative h-full rounded-[2rem] overflow-hidden shadow-sm group">
+            <div 
+              className="md:col-span-2 md:row-span-2 relative h-full rounded-[2rem] overflow-hidden shadow-sm group cursor-pointer"
+              onClick={() => openGallery(0)}
+            >
               <img 
-                src={property.images[0]} 
+                src={property.images[0] || 'https://placehold.co/800x600'} 
                 alt={property.title} 
-                className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-700"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
               />
-              <div className="absolute top-6 left-6 bg-white/90 backdrop-blur px-4 py-2 rounded-full text-sm font-bold shadow-sm uppercase tracking-wider text-slate-900">
-                {property.type}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
+              
+              <div className="absolute top-6 left-6 flex gap-2">
+                <span className="bg-white/90 backdrop-blur px-4 py-2 rounded-full text-sm font-bold shadow-sm uppercase tracking-wider text-slate-900">
+                  {property.type}
+                </span>
+                <span className={`px-4 py-2 rounded-full text-sm font-bold shadow-sm uppercase tracking-wider text-white backdrop-blur-md ${
+                  isRent ? 'bg-indigo-600/90' : 'bg-emerald-600/90'
+                }`}>
+                  {isRent ? 'Aluguel' : 'Venda'}
+                </span>
               </div>
             </div>
 
             {/* Imagens Secundárias */}
             {property.images.slice(1, 5).map((img, idx) => (
-              <div key={idx} className="relative h-full hidden md:block rounded-[2rem] overflow-hidden group">
+              <div 
+                key={idx} 
+                className="relative h-full hidden md:block rounded-[2rem] overflow-hidden group cursor-pointer"
+                onClick={() => openGallery(idx + 1)}
+              >
                 <img 
                   src={img} 
-                  alt={`View ${idx}`} 
-                  className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-700"
+                  alt={`Visão ${idx + 2}`} 
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                 />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
               </div>
             ))}
             
-            <button className="hidden md:flex absolute bottom-6 right-6 bg-white text-slate-900 px-6 py-3 rounded-full font-bold shadow-xl hover:bg-slate-50 transition-colors items-center gap-2">
+            <button 
+              onClick={() => openGallery(0)}
+              className="hidden md:flex absolute bottom-6 right-6 bg-white text-slate-900 px-6 py-3 rounded-full font-bold shadow-xl hover:bg-slate-50 transition-colors items-center gap-2"
+            >
               <Icons.Grid size={18} />
               Ver todas as fotos
             </button>
@@ -186,27 +329,29 @@ const PropertyDetail: React.FC = () => {
             </div>
           </div>
 
-          {/* --- COLUNA DIREITA (Sticky Sidebar - Estilo Referência) --- */}
+          {/* --- COLUNA DIREITA (Sticky Sidebar) --- */}
           <div className="lg:col-span-4 mt-2 lg:mt-0">
             <div className="lg:sticky lg:top-8">
               
               {/* Card Principal */}
               <div className="bg-white dark:bg-slate-800 p-6 md:p-8 rounded-[2rem] shadow-xl border border-slate-100 dark:border-slate-700">
-                {/* Preço */}
+                {/* Preço (Dinâmico para Aluguel/Venda) */}
                 <div className="mb-8">
-                    <p className="text-sm text-slate-500 font-medium uppercase tracking-wide mb-1">Preço de Venda</p>
-                    <h2 className="text-4xl font-bold text-slate-900 dark:text-white">
+                    <p className="text-sm text-slate-500 font-medium uppercase tracking-wide mb-1">
+                      {isRent ? 'Aluguel' : 'Preço de Venda'}
+                    </p>
+                    <h2 className="text-4xl font-bold text-slate-900 dark:text-white flex items-baseline gap-1">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(property.price)}
+                        {isRent && <span className="text-xl text-slate-500 font-medium">/mês</span>}
                     </h2>
                 </div>
 
                 <hr className="border-slate-100 dark:border-slate-700 my-6" />
 
-                {/* Info Corretor (Estilo "Amelia Stephenson") */}
+                {/* Info Corretor */}
                 <div className="flex items-center gap-4 mb-8">
                     <div className="w-14 h-14 rounded-full bg-slate-100 overflow-hidden">
-                        {/* Placeholder para foto do corretor se não houver */}
-                         <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-500 font-bold text-xl">
+                         <div className="w-full h-full flex items-center justify-center bg-brand-100 text-brand-600 font-bold text-xl">
                             {property.agent?.name?.charAt(0) || 'C'}
                          </div>
                     </div>
@@ -214,7 +359,7 @@ const PropertyDetail: React.FC = () => {
                         <h3 className="font-bold text-slate-900 dark:text-white text-lg">{property.agent?.name || 'Consultor Especialista'}</h3>
                         <div className="flex items-center gap-1 text-yellow-400 text-sm">
                             <Icons.Star size={14} fill="currentColor" />
-                            <span className="text-slate-600 dark:text-slate-400 font-medium">5.0 (124 vendas)</span>
+                            <span className="text-slate-600 dark:text-slate-400 font-medium">Corretor Premium</span>
                         </div>
                     </div>
                 </div>
@@ -249,7 +394,6 @@ const PropertyDetail: React.FC = () => {
                             onChange={e => setContactForm({...contactForm, phone: e.target.value})}
                          />
                          
-                         {/* Botão de Ação "Pill" Preto */}
                          <button
                             type="submit"
                             disabled={formStatus === 'sending'}

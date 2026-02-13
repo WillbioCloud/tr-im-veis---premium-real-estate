@@ -8,6 +8,8 @@ interface PropertyCardProps {
 }
 
 const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
+  const isRent = property.listing_type === 'rent';
+
   return (
     <Link to={`/imoveis/${property.slug}`} className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col h-full">
       <div className="relative h-64 overflow-hidden">
@@ -18,15 +20,29 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity" />
         
-        <div className="absolute top-4 left-4">
+        {/* Tags Superiores */}
+        <div className="absolute top-4 left-4 flex flex-wrap gap-2">
+          {/* Tag de Tipo (Casa, Apto) */}
           <span className="bg-white/90 backdrop-blur-md text-brand-900 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm">
             {property.type}
           </span>
+          
+          {/* NOVA Tag: Venda ou Aluguel */}
+          <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-sm backdrop-blur-md ${
+            isRent 
+              ? 'bg-indigo-600/90 text-white' // Cor para Aluguel
+              : 'bg-emerald-600/90 text-white' // Cor para Venda
+          }`}>
+            {isRent ? 'Aluguel' : 'Venda'}
+          </span>
         </div>
         
+        {/* Preço */}
         <div className="absolute bottom-4 left-4 text-white">
-          <p className="text-xl font-bold font-serif">
+          <p className="text-xl font-bold font-serif flex items-baseline gap-1">
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(property.price)}
+            {/* Adiciona o /mês se for aluguel */}
+            {isRent && <span className="text-sm font-sans font-medium opacity-90">/mês</span>}
           </p>
         </div>
       </div>
@@ -57,14 +73,14 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
           </div>
         </div>
 
-        {/* --- NOVO: RODAPÉ DO CORRETOR --- */}
+        {/* --- RODAPÉ DO CORRETOR --- */}
         <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${property.agent ? 'bg-emerald-500' : 'bg-brand-600'}`}>
-              {property.agent ? property.agent.name.charAt(0) : 'T'}
+              {property.agent && property.agent.name ? property.agent.name.charAt(0).toUpperCase() : 'T'}
             </div>
             <p className="text-xs font-bold text-slate-500">
-              {property.agent ? property.agent.name.split(' ')[0] : 'TR Imóveis'}
+              {property.agent && property.agent.name ? property.agent.name.split(' ')[0] : 'TR Imóveis'}
             </p>
           </div>
           <Icons.ArrowRight size={18} className="text-gray-400" />

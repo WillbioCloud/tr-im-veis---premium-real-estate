@@ -49,8 +49,8 @@ const About: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { name: 'Marina Teixeira', role: 'Especialista em Alto Padrão', icon: Sparkles },
-              { name: 'Rafael Nogueira', role: 'Consultor de Investimentos', icon: Building2 },
+              { name: 'Kalil Pires', role: 'Especialista em Alto Padrão', icon: Sparkles },
+              { name: 'Ibrahim Alhana', role: 'Consultor de Investimentos', icon: Building2 },
               { name: 'Larissa Pires', role: 'Gestora de Relacionamento', icon: Users }
             ].map((member) => (
               <article key={member.name} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
