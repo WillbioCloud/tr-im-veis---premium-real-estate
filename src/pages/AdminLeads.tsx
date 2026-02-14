@@ -1,407 +1,140 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { Lead, LeadStatus } from '../types';
+import React, { useState } from 'react';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import { useLeads } from '../hooks/useLeads';
+import { useAuth } from '../contexts/AuthContext';
 import { Icons } from '../components/Icons';
 import LeadDetailsSidebar from '../components/LeadDetailsSidebar';
-import { useAuth } from '../contexts/AuthContext';
-import { TOOLTIPS } from '../constants/tooltips';
 import Loading from '../components/Loading';
-import {
-  DndContext,
-  useDraggable,
-  useDroppable,
-  DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  defaultDropAnimationSideEffects,
-  DropAnimation
-} from '@dnd-kit/core';
-
-// Configuração da animação suave ao soltar
-const dropAnimation: DropAnimation = {
-  sideEffects: defaultDropAnimationSideEffects({
-    styles: {
-      active: { opacity: '0.5' }
-    }
-  })
-};
-
-// === COMPONENTES INTERNOS ===
-
-
-const isAbortError = (error: unknown): boolean => {
-  if (!error || typeof error !== 'object') return false;
-  const maybe = error as { name?: string; message?: string };
-  return maybe.name === 'AbortError' || maybe.message?.includes('AbortError') === true;
-};
-
-const DroppableColumn = ({
-  id,
-  children,
-  count,
-  title
-}: {
-  id: string;
-  children: React.ReactNode;
-  count: number;
-  title: string;
-}) => {
-  const { setNodeRef, isOver } = useDroppable({ id });
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={`flex-shrink-0 w-80 flex flex-col h-full rounded-2xl transition-colors duration-300 ${
-        isOver ? 'bg-slate-200/70 ring-2 ring-brand-400 ring-inset' : 'bg-slate-100/80'
-      }`}
-    >
-      {/* Header da Coluna */}
-      <div className="p-4 flex justify-between items-center sticky top-0 bg-inherit rounded-t-2xl z-10 backdrop-blur-sm">
-        <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wide flex items-center gap-2">
-          <div
-            className={`w-2 h-2 rounded-full ${
-              title === 'Novo'
-                ? 'bg-blue-500'
-                : title === 'Em Contato'
-                ? 'bg-amber-500'
-                : title === 'Fechado'
-                ? 'bg-emerald-500'
-                : 'bg-slate-400'
-            }`}
-          />
-          {title}
-        </h3>
-        <span className="bg-white px-2.5 py-0.5 rounded-full text-xs font-bold text-slate-500 shadow-sm border border-slate-200">
-          {count}
-        </span>
-      </div>
-
-      {/* Área de Cards */}
-      <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-3 custom-scrollbar">{children}</div>
-    </div>
-  );
-};
-
-// O Card agora aceita props de estilo para quando está sendo arrastado (isOverlay)
-const LeadCard = ({
-  lead,
-  onClick,
-  isAdmin,
-  isOverlay = false
-}: {
-  lead: Lead;
-  onClick?: () => void;
-  isAdmin: boolean;
-  isOverlay?: boolean;
-}) => {
-  const createdAt = (lead as any).createdAt ?? (lead as any).created_at ?? new Date().toISOString();
-  const score = (lead as any).score ?? 0;
-  const metadata = (lead as any).metadata;
-
-  return (
-    <div
-      onClick={onClick}
-      className={`
-        bg-white p-4 rounded-xl border border-slate-200 group relative transition-all duration-200
-        ${
-          isOverlay
-            ? 'shadow-2xl scale-105 rotate-2 cursor-grabbing ring-2 ring-brand-500 z-50'
-            : 'shadow-sm hover:shadow-md cursor-grab hover:border-brand-300'
-        }
-      `}
-    >
-      {/* Header do Card */}
-      <div className="flex justify-between items-start mb-3">
-        <div>
-          <h4 className="font-bold text-slate-800 line-clamp-1 text-sm">{lead.name}</h4>
-          <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-            {new Date(createdAt).toLocaleDateString()} •{' '}
-            {new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </p>
-        </div>
-        {score > 70 && (
-          <span className="bg-orange-50 text-orange-600 p-1 rounded-md" title="Lead Quente">
-            <Icons.Flame size={14} />
-          </span>
-        )}
-      </div>
-
-      {/* Badges de Origem */}
-      <div className="mb-3 flex flex-wrap gap-1">
-        {(lead as any).property?.agent ? (
-          <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded border border-indigo-100 flex items-center w-fit gap-1 font-semibold">
-            <Icons.User size={10} /> {(lead as any).property.agent.name.split(' ')[0]}
-          </span>
-        ) : (
-          <span className="text-[10px] bg-brand-50 text-brand-700 px-2 py-1 rounded border border-brand-100 flex items-center w-fit gap-1 font-semibold">
-            <Icons.Shield size={10} /> Imobiliária
-          </span>
-        )}
-
-        {metadata?.visited_properties && metadata.visited_properties.length > 1 && (
-          <span
-            className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200 flex items-center w-fit gap-1 font-semibold"
-            title="Visitou múltiplos imóveis"
-          >
-            <Icons.MapPin size={10} /> +{metadata.visited_properties.length - 1} vistos
-          </span>
-        )}
-      </div>
-
-      {/* Mensagem Curta */}
-      {(lead as any).message && (
-        <p className="text-xs text-slate-500 mb-3 line-clamp-2 bg-slate-50 p-2 rounded-lg italic border border-slate-100">
-          "{(lead as any).message}"
-        </p>
-      )}
-
-      {/* Footer do Card */}
-      <div className="flex justify-between items-center pt-2 border-t border-slate-100">
-        <p className="text-[10px] text-slate-400 truncate max-w-[120px]">
-          {(lead as any).property?.title || 'Interesse Geral'}
-        </p>
-        <div className="flex items-center gap-1.5">
-          <div className="h-1.5 w-16 bg-slate-100 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full ${
-                score > 60 ? 'bg-emerald-500' : score > 30 ? 'bg-amber-400' : 'bg-slate-300'
-              }`}
-              style={{ width: `${score}%` }}
-            />
-          </div>
-          <span className="text-[10px] font-bold text-slate-600">{score}</span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Wrapper para DND Kit
-const DraggableCardWrapper = ({ lead, onClick, isAdmin }: { lead: Lead; onClick: () => void; isAdmin: boolean }) => {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: lead.id });
-
-  if (isDragging) {
-    return (
-      <div
-        ref={setNodeRef}
-        className="opacity-30 grayscale p-4 bg-slate-50 border border-dashed border-slate-300 rounded-xl h-[160px]"
-      >
-        {/* Placeholder vazio onde o card estava */}
-      </div>
-    );
-  }
-
-  return (
-    <div ref={setNodeRef} {...listeners} {...attributes}>
-      <LeadCard lead={lead} onClick={onClick} isAdmin={isAdmin} />
-    </div>
-  );
-};
-
-// === PÁGINA PRINCIPAL ===
+import { supabase } from '../lib/supabase';
+import { Lead } from '../types';
 
 const AdminLeads: React.FC = () => {
-  const { user } = useAuth();
-  const isAdmin = (user as any)?.role === 'admin';
-
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const { leads, loading, updateLeadStatus, refreshLeads } = useLeads();
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Modal de Fechamento
+  const [closingLead, setClosingLead] = useState<Lead | null>(null);
+  const [dealValue, setDealValue] = useState<string>('');
+  const [isCustomValue, setIsCustomValue] = useState(false);
 
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
-  );
+  const columns = [
+    { id: 'new', title: 'Novos', color: 'border-blue-500' },
+    { id: 'contacted', title: 'Contatado', color: 'border-indigo-500' },
+    { id: 'visiting', title: 'Visita', color: 'border-purple-500' },
+    { id: 'negotiating', title: 'Proposta', color: 'border-pink-500' },
+    { id: 'closed', title: 'Fechado', color: 'border-emerald-500' },
+  ];
 
-  const fetchLeads = async () => {
-    if (!user?.id) return;
+  const handleDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+    const { draggableId, destination } = result;
+    const newStatus = destination.droppableId;
 
-    const shouldShowInitialLoading = leads.length === 0;
-    if (shouldShowInitialLoading) {
-      setLoading(true);
+    if (newStatus === 'closed') {
+      const lead = leads.find(l => l.id === draggableId);
+      if (lead) {
+        setClosingLead(lead);
+        // Tenta pegar preço do imóvel se existir, senão zera
+        // @ts-ignore
+        if (lead.properties?.price) setDealValue(lead.properties.price.toString());
+        setIsCustomValue(false);
+      }
+      return; 
     }
+    await updateLeadStatus(draggableId, newStatus);
+  };
 
-    let aborted = false;
-
+  const confirmClosing = async () => {
+    if (!closingLead || !dealValue) return;
     try {
-      let query = supabase
+      const { error } = await supabase
         .from('leads')
-        .select(`
-          *,
-          property:properties (
-            title,
-            agent_id,
-            agent:profiles (name)
-          )
-        `)
-        .order('created_at', { ascending: false });
-
-      if (!isAdmin) {
-        query = query.eq('assigned_to', user.id);
-      }
-
-      const { data, error } = await query;
-
+        .update({ status: 'closed', deal_value: parseFloat(dealValue), updated_at: new Date().toISOString() })
+        .eq('id', closingLead.id);
       if (error) throw error;
-      if (data) setLeads(data as Lead[]);
-    } catch (error) {
-      if (isAbortError(error)) {
-        aborted = true;
-        return;
-      }
-
-      console.error('Erro ao buscar leads:', error);
-    } finally {
-      if (!aborted && shouldShowInitialLoading) {
-        setLoading(false);
-      }
-    }
+      await refreshLeads();
+      setClosingLead(null);
+      setDealValue('');
+    } catch (error) { alert('Erro ao registrar fechamento.'); }
   };
 
-  useEffect(() => {
-    if (user) {
-      fetchLeads();
-    }
-  }, [user]);
-
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
-  };
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveId(null);
-
-    if (!over) return;
-
-    const leadId = active.id as string;
-    const newStatus = over.id as LeadStatus;
-    const lead = leads.find((l) => l.id === leadId);
-
-    if (lead && lead.status !== newStatus) {
-      setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l)));
-      await supabase.from('leads').update({ status: newStatus }).eq('id', leadId);
-    }
-  };
-
-  const activeLead = useMemo(() => (activeId ? leads.find((l) => l.id === activeId) : null), [activeId, leads]);
-  const selectedLeadHistory = useMemo(() => {
-    const visited = (selectedLead as { metadata?: { visited_properties?: unknown } } | null)?.metadata?.visited_properties;
-    if (!Array.isArray(visited)) return [];
-
-    return visited.filter((item): item is { title: string; slug: string; visited_at: string } => {
-      if (!item || typeof item !== 'object') return false;
-      const candidate = item as { title?: unknown; slug?: unknown; visited_at?: unknown };
-      return (
-        typeof candidate.title === 'string' &&
-        typeof candidate.slug === 'string' &&
-        typeof candidate.visited_at === 'string'
-      );
-    });
-  }, [selectedLead]);
-
-  if (loading && leads.length === 0) return <Loading />;
+  const filteredLeads = leads.filter(lead => lead.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  if (loading) return <Loading />;
 
   return (
-    <div className="h-[calc(100vh-2rem)] flex flex-col animate-fade-in">
-      <div className="mb-6 flex justify-between items-center shrink-0">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-serif font-bold text-slate-800 flex items-center gap-2">
-              Gestão de Leads <Icons.Info size={16} className="text-slate-400" />
-            </h1>
-            <p className="text-sm text-slate-500">Arraste os cards para atualizar o status.</p>
-          </div>
-          
-          <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase border ${
-            isAdmin 
-              ? 'bg-purple-50 text-purple-700 border-purple-200' 
-              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-          }`}>
-            {isAdmin ? 'Visão Admin (Total)' : 'Meus Leads'}
-          </span>
+    <div className="h-[calc(100vh-6rem)] flex flex-col animate-fade-in">
+      <div className="flex justify-between items-center mb-6">
+        <div><h1 className="text-2xl font-bold text-slate-800 dark:text-white">Gestão de Leads (Funil)</h1></div>
+        <div className="relative">
+          <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+          <input type="text" placeholder="Buscar lead..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-10 pr-4 py-2 bg-white dark:bg-dark-card border rounded-lg" />
         </div>
-
-        {isAdmin && (
-          <div className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm">
-            <span className="text-xs font-bold text-slate-600">Auto Distribuição</span>
-            <div className="w-8 h-4 bg-brand-600 rounded-full relative cursor-pointer">
-              <div className="absolute right-0.5 top-0.5 w-3 h-3 bg-white rounded-full shadow-sm"></div>
-            </div>
-          </div>
-        )}
       </div>
 
-      {selectedLead && (
-        <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">
-            Histórico de navegação: {selectedLead.name}
-          </p>
-          {selectedLeadHistory.length > 0 ? (
-            <ul className="space-y-1 text-sm text-slate-600">
-              {selectedLeadHistory.slice(0, 5).map((visit, index) => (
-                <li key={`${visit.slug}-${visit.visited_at}-${index}`} className="flex justify-between gap-2">
-                  <span className="truncate">{visit.title}</span>
-                  <span className="text-xs text-slate-400 whitespace-nowrap">
-                    {new Date(visit.visited_at).toLocaleString()}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-slate-400 italic">Sem histórico registrado no metadata.</p>
-          )}
-        </div>
-      )}
-
-      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4">
-          <div className="flex h-full gap-6 min-w-max px-1">
-            {Object.values(LeadStatus).map((status) => (
-              <DroppableColumn
-                key={status as any}
-                id={status as any}
-                title={status as any}
-                count={leads.filter((l) => l.status === status).length}
-              >
-                {leads
-                  .filter((l) => l.status === status)
-                  .map((lead) => (
-                    <DraggableCardWrapper
-                      key={lead.id}
-                      lead={lead}
-                      isAdmin={isAdmin}
-                      onClick={() => setSelectedLead(lead)}
-                    />
-                  ))}
-              </DroppableColumn>
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div className="flex-1 overflow-x-auto">
+          <div className="flex gap-6 min-w-max h-full pb-4 px-1">
+            {columns.map(column => (
+              <div key={column.id} className="w-80 flex flex-col bg-slate-50 dark:bg-dark-card/50 rounded-xl border border-slate-200 dark:border-dark-border/50">
+                <div className={`p-4 border-b-2 ${column.color} bg-white dark:bg-dark-card rounded-t-xl`}>
+                  <h3 className="font-bold text-slate-700 dark:text-white flex justify-between">
+                    {column.title}
+                    <span className="bg-slate-100 px-2 rounded-full text-xs">{filteredLeads.filter(l => l.status === column.id).length}</span>
+                  </h3>
+                </div>
+                <Droppable droppableId={column.id}>
+                  {(provided) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="p-3 flex-1 overflow-y-auto space-y-3 custom-scrollbar">
+                      {filteredLeads.filter(l => l.status === column.id).map((lead, index) => (
+                          <Draggable key={lead.id} draggableId={lead.id} index={index}>
+                            {(provided) => (
+                              <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} onClick={() => setSelectedLead(lead)} className="bg-white dark:bg-dark-card p-4 rounded-lg shadow-sm hover:shadow-md cursor-pointer">
+                                <span className="font-bold block mb-2">{lead.name}</span>
+                                {lead.deal_value && lead.status === 'closed' && (
+                                   <div className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded inline-block">
+                                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lead.deal_value)}
+                                   </div>
+                                )}
+                              </div>
+                            )}
+                          </Draggable>
+                        ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </div>
             ))}
           </div>
         </div>
+      </DragDropContext>
 
-        <DragOverlay dropAnimation={dropAnimation}>
-          {activeLead ? <LeadCard lead={activeLead} isAdmin={isAdmin} isOverlay /> : null}
-        </DragOverlay>
-      </DndContext>
+      <LeadDetailsSidebar lead={selectedLead} onClose={() => setSelectedLead(null)} onUpdate={refreshLeads} />
 
-      {selectedLead && (
-        <LeadDetailsSidebar
-          lead={selectedLead}
-          onClose={() => setSelectedLead(null)}
-          onStatusChange={async (status) => {
-            setLeads((prev) => prev.map((l) => (l.id === selectedLead.id ? { ...l, status } : l)));
-            await supabase.from('leads').update({ status }).eq('id', selectedLead.id);
-            setSelectedLead({ ...(selectedLead as any), status } as any);
-          }}
-        />
+      {closingLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-dark-card w-full max-w-md rounded-2xl p-6 shadow-2xl">
+            <h2 className="text-xl font-bold mb-4">Confirmar Venda 🎉</h2>
+            <div className="space-y-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="saleType" checked={!isCustomValue} onChange={() => setIsCustomValue(false)} />
+                <span>Vendeu o imóvel de interesse</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="saleType" checked={isCustomValue} onChange={() => { setIsCustomValue(true); setDealValue(''); }} />
+                <span>Vendeu outro imóvel (Digitar valor)</span>
+              </label>
+              <input type="number" value={dealValue} onChange={e => setDealValue(e.target.value)} className="w-full mt-1 px-4 py-3 border rounded-lg font-bold text-lg" placeholder="0,00" />
+              <div className="flex gap-3 mt-6">
+                <button onClick={() => setClosingLead(null)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-lg">Cancelar</button>
+                <button onClick={confirmClosing} disabled={!dealValue} className="flex-1 py-3 bg-slate-900 text-white font-bold rounded-lg hover:bg-slate-800">Confirmar</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
 };
-
 export default AdminLeads;
