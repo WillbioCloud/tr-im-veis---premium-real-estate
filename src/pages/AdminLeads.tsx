@@ -212,6 +212,10 @@ const AdminLeads: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [closingLead, setClosingLead] = useState<Lead | null>(null);
+  const [dealValue, setDealValue] = useState('');
+  const [isCustomValue, setIsCustomValue] = useState(false);
+  const [savingClosing, setSavingClosing] = useState(false);
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
@@ -235,6 +239,7 @@ const AdminLeads: React.FC = () => {
           *,
           property:properties (
             title,
+            price,
             agent_id,
             agent:profiles (name)
           )
@@ -284,9 +289,35 @@ const AdminLeads: React.FC = () => {
     const lead = leads.find((l) => l.id === leadId);
 
     if (lead && lead.status !== newStatus) {
+      if (newStatus === LeadStatus.CLOSED) {
+        const suggestedValue = Number((lead as any)?.property?.price || 0);
+        setClosingLead(lead);
+        setIsCustomValue(false);
+        setDealValue(suggestedValue > 0 ? String(Math.round(suggestedValue)) : '');
+        return;
+      }
+
       setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l)));
       await supabase.from('leads').update({ status: newStatus }).eq('id', leadId);
     }
+  };
+
+  const handleConfirmClosing = async () => {
+    if (!closingLead) return;
+
+    setSavingClosing(true);
+    const parsedValue = Number(String(dealValue).replace(/\./g, '').replace(',', '.')) || 0;
+
+    await supabase
+      .from('leads')
+      .update({ status: LeadStatus.CLOSED, deal_value: parsedValue })
+      .eq('id', closingLead.id);
+
+    setClosingLead(null);
+    setDealValue('');
+    setIsCustomValue(false);
+    await fetchLeads();
+    setSavingClosing(false);
   };
 
   const activeLead = useMemo(() => (activeId ? leads.find((l) => l.id === activeId) : null), [activeId, leads]);
@@ -399,6 +430,78 @@ const AdminLeads: React.FC = () => {
             setSelectedLead({ ...(selectedLead as any), status } as any);
           }}
         />
+      )}
+
+      {closingLead && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 space-y-5">
+            <div>
+              <h3 className="text-xl font-bold text-slate-800">Confirmar Fechamento</h3>
+              <p className="text-sm text-slate-500 mt-1">Lead: <span className="font-semibold text-slate-700">{closingLead.name}</span></p>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-slate-700">Vendeu o imóvel de interesse?</p>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="radio"
+                  name="closing-value"
+                  checked={!isCustomValue}
+                  onChange={() => {
+                    setIsCustomValue(false);
+                    const suggestedValue = Number((closingLead as any)?.property?.price || 0);
+                    setDealValue(suggestedValue > 0 ? String(Math.round(suggestedValue)) : '');
+                  }}
+                />
+                Sim
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="radio"
+                  name="closing-value"
+                  checked={isCustomValue}
+                  onChange={() => setIsCustomValue(true)}
+                />
+                Não - Outro Valor
+              </label>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor do Fechamento</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-brand-500"
+                value={dealValue}
+                onChange={(e) => setDealValue(e.target.value)}
+                placeholder="Ex: 850000"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setClosingLead(null);
+                  setDealValue('');
+                  setIsCustomValue(false);
+                }}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmClosing}
+                disabled={savingClosing}
+                className="px-5 py-2 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {savingClosing ? 'Confirmando...' : 'Confirmar Venda'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

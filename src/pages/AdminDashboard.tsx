@@ -44,6 +44,7 @@ const AdminDashboard: React.FC = () => {
     saleProperties: 0,
     rentProperties: 0,
     totalVgv: 0,
+    annualVgv: 0,
     activeDeals: 0,
   });
 
@@ -57,6 +58,20 @@ const AdminDashboard: React.FC = () => {
   const [hotLeads, setHotLeads] = useState<any[]>([]);
   const [agenda, setAgenda] = useState<any[]>([]);
   const [agentsPerformance, setAgentsPerformance] = useState<any[]>([]);
+
+  const salesFunnel = useMemo(() => {
+    const steps = [LeadStatus.NEW, LeadStatus.CONTACTED, LeadStatus.VISIT, LeadStatus.PROPOSAL, LeadStatus.CLOSED];
+    const total = Math.max(1, adminStats.totalLeads);
+
+    return steps.map((step) => {
+      const count = hotLeads.filter((lead) => lead.status === step).length;
+      return {
+        step,
+        count,
+        width: Math.max(6, Math.round((count / total) * 100)),
+      };
+    });
+  }, [adminStats.totalLeads, hotLeads]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -74,22 +89,21 @@ const AdminDashboard: React.FC = () => {
 
     try {
       if (isAdmin) {
-        const [propertiesRes, leadsRes, activeDealsRes, hotLeadsRes, agentsRes] = await Promise.all([
+        const [propertiesRes, agentsRes, leadsRes] = await Promise.all([
           supabase.from('properties').select('id, price, listing_type, agent_id'),
-          supabase.from('leads').select('id', { count: 'exact', head: true }),
-          supabase.from('leads').select('id', { count: 'exact', head: true }).not('status', 'in', `(${LeadStatus.LOST},${LeadStatus.CLOSED})`),
-          supabase
-            .from('leads')
-            .select('id, name, status, lead_score, created_at, property:properties(title)')
-            .order('lead_score', { ascending: false })
-            .limit(6),
           supabase.from('profiles').select('id, name, role').eq('role', 'corretor'),
+          supabase.from('leads').select('id, assigned_to, status, deal_value, updated_at'),
         ]);
 
         const properties = propertiesRes.data || [];
-        const totalVgv = properties
-          .filter((property: any) => property.listing_type !== 'rent')
-          .reduce((acc: number, property: any) => acc + Number(property.price || 0), 0);
+        const leadRows = leadsRes.data || [];
+        const currentYear = new Date().getFullYear();
+        const closedLeads = leadRows.filter((lead: any) => lead.status === LeadStatus.CLOSED);
+        const totalVgv = closedLeads.reduce((acc: number, lead: any) => acc + Number(lead.deal_value || 0), 0);
+        const annualVgv = closedLeads
+          .filter((lead: any) => new Date(lead.updated_at).getFullYear() === currentYear)
+          .reduce((acc: number, lead: any) => acc + Number(lead.deal_value || 0), 0);
+        const activeDeals = leadRows.filter((lead: any) => ![LeadStatus.LOST, LeadStatus.CLOSED].includes(lead.status)).length;
 
         const perfRows = (agentsRes.data || []).map((agent: any) => {
           const agentProperties = properties.filter((property: any) => property.agent_id === agent.id).length;
@@ -100,9 +114,8 @@ const AdminDashboard: React.FC = () => {
           };
         });
 
-        const { data: leadsByAgent } = await supabase.from('leads').select('assigned_to, status');
         const perf = perfRows.map((row: any) => {
-          const myLeads = (leadsByAgent || []).filter((lead: any) => lead.assigned_to === row.id);
+          const myLeads = leadRows.filter((lead: any) => lead.assigned_to === row.id);
           const won = myLeads.filter((lead: any) => lead.status === LeadStatus.CLOSED).length;
           return {
             ...row,
@@ -118,11 +131,12 @@ const AdminDashboard: React.FC = () => {
           totalProperties: properties.length,
           saleProperties,
           rentProperties,
-          totalLeads: leadsRes.count || 0,
-          activeDeals: activeDealsRes.count || 0,
+          totalLeads: leadRows.length,
+          activeDeals,
           totalVgv,
+          annualVgv,
         });
-        setHotLeads(hotLeadsRes.data || []);
+        setHotLeads(leadRows);
         setAgentsPerformance(perf);
       } else {
         const [profileRes, hotLeadsRes, tasksRes, openLeadsRes] = await Promise.all([
@@ -195,9 +209,15 @@ const AdminDashboard: React.FC = () => {
       {isAdmin ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+            {isAdmin && (
+              <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <p className="text-sm text-slate-500">VGV Total</p>
+                <h3 className="text-3xl font-bold text-slate-900 mt-1">{loading ? '...' : formatBRL(adminStats.totalVgv)}</h3>
+              </div>
+            )}
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-              <p className="text-sm text-slate-500">VGV Total</p>
-              <h3 className="text-3xl font-bold text-slate-900 mt-1">{loading ? '...' : formatBRL(adminStats.totalVgv)}</h3>
+              <p className="text-sm text-slate-500">VGV Anual</p>
+              <h3 className="text-3xl font-bold text-slate-900 mt-1">{loading ? '...' : formatBRL(adminStats.annualVgv)}</h3>
             </div>
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
               <p className="text-sm text-slate-500">Leads Totais</p>
@@ -238,14 +258,28 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+              <h3 className="font-bold text-slate-800 mb-4">Funil de Vendas</h3>
+              <div className="space-y-3 mb-6">
+                {salesFunnel.map((step) => (
+                  <div key={step.step}>
+                    <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                      <span>{step.step}</span>
+                      <span className="font-bold text-slate-700">{step.count}</span>
+                    </div>
+                    <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full rounded-full bg-gradient-to-r from-brand-500 to-brand-600" style={{ width: `${step.width}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
               <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <Icons.Flame size={18} className="text-orange-500" />
-                Leads Quentes
+                <Icons.Flame size={18} className="text-orange-500" /> Leads Quentes
               </h3>
-              <div className="space-y-3">
-                {hotLeads.map((lead) => (
+              <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                {hotLeads.slice(0, 6).map((lead) => (
                   <div key={lead.id} className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                    <p className="font-semibold text-slate-800">{lead.name}</p>
+                    <p className="font-semibold text-slate-800">{lead.name || 'Lead sem nome'}</p>
                     <p className="text-xs text-slate-500 truncate">{lead.property?.title || 'Interesse geral'}</p>
                     <p className="text-xs font-bold text-orange-600 mt-1">Score: {lead.lead_score || 0}</p>
                   </div>
