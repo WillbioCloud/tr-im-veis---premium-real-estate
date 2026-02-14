@@ -47,6 +47,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// --- Helpers para tratamento de dados seguros ---
 const toNumber = (value: unknown, fallback: number): number => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -54,7 +55,6 @@ const toNumber = (value: unknown, fallback: number): number => {
 
 const buildFallbackUser = (supabaseUser: User): UserWithRole => {
   const metadata = (supabaseUser.user_metadata as Record<string, unknown> | undefined) ?? {};
-
   return {
     ...supabaseUser,
     name: (metadata.name as string | undefined) ?? 'Usuário',
@@ -68,10 +68,7 @@ const buildFallbackUser = (supabaseUser: User): UserWithRole => {
 };
 
 const mergeUserWithProfile = (supabaseUser: User, profile: ProfileData | null): UserWithRole => {
-  if (!profile) {
-    return buildFallbackUser(supabaseUser);
-  }
-
+  if (!profile) return buildFallbackUser(supabaseUser);
   return {
     ...supabaseUser,
     role: profile.role ?? 'corretor',
@@ -88,175 +85,124 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<UserWithRole | null>(null);
   const [loading, setLoading] = useState(true);
-
+  
+  // Refs para controle de montagem e estado atual (evita dependências circulares)
   const isMounted = useRef(true);
-  const initialLoadResolved = useRef(false);
+  const currentUserRef = useRef<UserWithRole | null>(null);
 
-  const resolveInitialLoading = useCallback(() => {
-    if (!isMounted.current || initialLoadResolved.current) {
-      return;
-    }
+  // Mantém o ref sincronizado com o state
+  useEffect(() => {
+    currentUserRef.current = user;
+  }, [user]);
 
-    initialLoadResolved.current = true;
-    setLoading(false);
-  }, []);
-
-  const fetchProfileData = useCallback(async (supabaseUser: User): Promise<UserWithRole> => {
-    const fallbackUser = buildFallbackUser(supabaseUser);
-
+  // Busca dados do perfil
+  const fetchProfileData = useCallback(async (currentSession: Session): Promise<UserWithRole> => {
+    if (!currentSession.user) return buildFallbackUser(currentSession.user);
+    
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', supabaseUser.id)
+        .eq('id', currentSession.user.id)
         .maybeSingle();
 
       if (error) {
-        console.warn('Falha ao carregar profile. Mantendo sessão com fallback.', error.message);
-        return fallbackUser;
+        return buildFallbackUser(currentSession.user);
       }
 
-      return mergeUserWithProfile(supabaseUser, (data as ProfileData | null) ?? null);
-    } catch (error) {
-      console.warn('Erro inesperado no profile. Mantendo sessão com fallback.', error);
-      return fallbackUser;
+      return mergeUserWithProfile(currentSession.user, (data as ProfileData | null) ?? null);
+    } catch {
+      return buildFallbackUser(currentSession.user);
     }
   }, []);
 
-  const applySession = useCallback(
-    async (nextSession: Session | null) => {
-      if (!isMounted.current) return;
-
-      if (!nextSession?.user) {
-        setSession(null);
-        setUser(null);
-        return;
-      }
-
-      const supabaseUser = nextSession.user;
-      setSession(nextSession);
-
-      // Sessão Suprema: usuário entra imediatamente se a sessão existe.
-      const fallbackUser = buildFallbackUser(supabaseUser);
-      setUser(fallbackUser);
-
-      const profileUser = await fetchProfileData(supabaseUser);
-      if (!isMounted.current) return;
-
-      setUser(profileUser);
-    },
-    [fetchProfileData]
-  );
-
-  const refreshUser = useCallback(async () => {
-    if (!isMounted.current || !session?.user) return;
-
-    const nextUser = await fetchProfileData(session.user);
+  // Aplica a sessão ao estado (Lógica Principal)
+  const applySession = useCallback(async (currentSession: Session | null, forceUpdate = false) => {
     if (!isMounted.current) return;
 
-    setUser(nextUser);
-  }, [fetchProfileData, session]);
-
-  const silentRevalidateSession = useCallback(async () => {
-    try {
-      const {
-        data: { session: existingSession },
-      } = await supabase.auth.getSession();
-
-      if (existingSession) {
-        await applySession(existingSession);
-        return;
-      }
-
-      const {
-        data: { session: refreshedSession },
-      } = await supabase.auth.refreshSession();
-
-      if (refreshedSession) {
-        await applySession(refreshedSession);
-      }
-    } catch (error) {
-      console.warn('Revalidação silenciosa falhou.', error);
+    if (!currentSession) {
+      setSession(null);
+      setUser(null);
+      setLoading(false);
+      return;
     }
-  }, [applySession]);
+
+    // --- CORREÇÃO CRÍTICA DO LOOP ---
+    // Se já temos um usuário carregado e o ID é o mesmo da nova sessão,
+    // significa que é apenas um refresh de token (mudança de aba, etc).
+    // NÃO recarregamos o perfil para evitar piscar a tela ou loop.
+    if (!forceUpdate && currentUserRef.current?.id === currentSession.user.id) {
+      console.log('Sessão renovada (Token Refresh). Mantendo estado do usuário.');
+      setSession(currentSession); // Apenas atualiza o token novo
+      return; 
+    }
+
+    // Se chegou aqui, é um login novo ou troca de usuário real
+    setSession(currentSession);
+    
+    // Define usuário básico imediatamente (Optimistic UI)
+    const basicUser = buildFallbackUser(currentSession.user);
+    setUser(basicUser);
+
+    // Busca dados completos
+    const fullUser = await fetchProfileData(currentSession);
+    
+    if (isMounted.current) {
+      setUser(fullUser);
+      setLoading(false);
+    }
+  }, [fetchProfileData]);
 
   useEffect(() => {
     isMounted.current = true;
 
-    const initializeAuth = async () => {
-      try {
-        const {
-          data: { session: initialSession },
-        } = await supabase.auth.getSession();
+    // 1. Inicialização
+    supabase.auth.getSession().then(({ data: { session: initSession } }) => {
+      applySession(initSession);
+    });
 
-        await applySession(initialSession);
-      } catch (error) {
-        console.error('Falha ao inicializar autenticação.', error);
-      } finally {
-        // Sem loops: loading é resolvido ao fim da primeira verificação.
-        resolveInitialLoading();
-      }
-    };
-
-    initializeAuth();
-
+    // 2. Listener do Supabase
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       if (!isMounted.current) return;
+      
+      console.log(`Auth Event: ${event}`); 
 
       if (event === 'SIGNED_OUT') {
         setSession(null);
         setUser(null);
-        resolveInitialLoading();
-        return;
-      }
-
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        await applySession(nextSession);
-        resolveInitialLoading();
+        setLoading(false);
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        // Passamos 'false' para forceUpdate, ativando a proteção contra loop
+        if (newSession) await applySession(newSession, false);
       }
     });
-
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState !== 'visible' || !isMounted.current) {
-        return;
-      }
-
-      await silentRevalidateSession();
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       isMounted.current = false;
       subscription.unsubscribe();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [applySession, resolveInitialLoading, silentRevalidateSession]);
+  }, [applySession]);
+
+  const refreshUser = async () => {
+    if (!session) return;
+    const { data } = await supabase.auth.refreshSession();
+    // Aqui usamos forceUpdate = true porque o usuário pediu explicitamente para atualizar
+    if (data.session) await applySession(data.session, true);
+  };
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error };
   };
 
-  const signUp = async (
-    name: string,
-    email: string,
-    password: string,
-    metaData?: Record<string, unknown>
-  ) => {
+  const signUp = async (name: string, email: string, password: string, metaData?: Record<string, unknown>) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: {
-          name,
-          ...metaData,
-        },
-      },
+      options: { data: { name, ...metaData } },
     });
-
     return { error };
   };
 
@@ -273,10 +219,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-
   if (context === undefined) {
     throw new Error('useAuth deve ser usado dentro de um AuthProvider');
   }
-
   return context;
 };
