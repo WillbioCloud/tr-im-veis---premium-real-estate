@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Lead, LeadStatus, Task, TimelineEvent, Property } from '../types';
 import { Icons } from './Icons';
+import { useAuth } from '../contexts/AuthContext';
 
 // --- Interfaces ---
 interface Template {
@@ -36,6 +37,8 @@ interface LeadDetailsSidebarProps {
 type TabId = 'whatsapp' | 'timeline' | 'history' | 'tasks' | 'info';
 
 const LeadDetailsSidebar: React.FC<LeadDetailsSidebarProps> = ({ lead, onClose, onStatusChange }) => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [activeTab, setActiveTab] = useState<TabId>('whatsapp');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [events, setEvents] = useState<TimelineEvent[]>([]);
@@ -46,6 +49,8 @@ const LeadDetailsSidebar: React.FC<LeadDetailsSidebarProps> = ({ lead, onClose, 
   const [viewedProperties, setViewedProperties] = useState<Property[]>([]);
   const [matches, setMatches] = useState<Property[]>([]);
   const [loadingMatches, setLoadingMatches] = useState(false);
+  const [agents, setAgents] = useState<Array<{ id: string; name: string; active: boolean }>>([]);
+  const [changingAgent, setChangingAgent] = useState(false);
 
   const leadFirstName = useMemo(() => (lead.name || '').trim().split(' ')[0] || 'Cliente', [lead.name]);
   const leadPhoneClean = useMemo(() => (lead.phone || '').replace(/\D/g, ''), [lead.phone]);
@@ -193,6 +198,39 @@ const LeadDetailsSidebar: React.FC<LeadDetailsSidebarProps> = ({ lead, onClose, 
     return Array.isArray(arr) ? arr.filter((v: any) => v.title && v.visited_at) : [];
   }, [lead]);
 
+  const leadOwnerName = useMemo(() => {
+    const owner = (lead as any).assignee?.name;
+    if (owner) return owner;
+    if ((lead as any).assigned_to && (lead as any).assigned_to === user?.id) return 'Você';
+    return 'Não atribuído';
+  }, [lead, user?.id]);
+
+  useEffect(() => {
+    const fetchAgents = async () => {
+      if (!isAdmin) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, name, active')
+        .eq('active', true)
+        .in('role', ['corretor', 'admin'])
+        .order('name', { ascending: true });
+
+      if (data) setAgents(data as Array<{ id: string; name: string; active: boolean }>);
+    };
+
+    fetchAgents();
+  }, [isAdmin]);
+
+  const handleAgentTransfer = async (agentId: string) => {
+    if (!isAdmin || !agentId || changingAgent) return;
+    setChangingAgent(true);
+    const { error } = await supabase.from('leads').update({ assigned_to: agentId }).eq('id', lead.id);
+    if (!error) {
+      await addTimelineLog('system', 'Lead transferido para outro corretor.');
+    }
+    setChangingAgent(false);
+  };
+
   return (
     <div className="fixed inset-y-0 right-0 w-full md:w-[500px] bg-white shadow-2xl z-[60] transform transition-transform duration-300 ease-out flex flex-col border-l border-slate-100">
       
@@ -247,6 +285,13 @@ const LeadDetailsSidebar: React.FC<LeadDetailsSidebarProps> = ({ lead, onClose, 
             )}
           </div>
         </div>
+
+        {lead.status === LeadStatus.CLOSED && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mt-4">
+            <p className="text-[10px] uppercase font-bold text-emerald-700 mb-1">Valor do Fechamento</p>
+            <p className="text-xl font-bold text-emerald-700">R$ {Number((lead as any).deal_value || 0).toLocaleString('pt-BR')}</p>
+          </div>
+        )}
       </div>
 
       {/* TABS NAVIGATION */}
@@ -376,6 +421,24 @@ const LeadDetailsSidebar: React.FC<LeadDetailsSidebarProps> = ({ lead, onClose, 
             <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm space-y-4">
               <div><p className="text-xs text-slate-400">Email</p><p className="font-bold text-slate-700">{lead.email || 'Não informado'}</p></div>
               <div><p className="text-xs text-slate-400">Telefone</p><p className="font-bold text-slate-700">{lead.phone}</p></div>
+              <div>
+                <p className="text-xs text-slate-400">Corretor Responsável</p>
+                {isAdmin ? (
+                  <select
+                    className="mt-1 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-brand-500"
+                    value={(lead as any).assigned_to || ''}
+                    onChange={(e) => handleAgentTransfer(e.target.value)}
+                    disabled={changingAgent}
+                  >
+                    <option value="">Selecione um corretor</option>
+                    {agents.map((agent) => (
+                      <option key={agent.id} value={agent.id}>{agent.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="font-bold text-slate-700">{leadOwnerName}</p>
+                )}
+              </div>
             </div>
             
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">

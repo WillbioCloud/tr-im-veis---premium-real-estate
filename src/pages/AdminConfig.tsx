@@ -15,32 +15,26 @@ interface Profile {
   active: boolean;
 }
 
-interface Template {
-  id: string;
-  title: string;
-  content: string;
-}
-
 const AdminConfig: React.FC = () => {
   const { user, refreshUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const isAdmin = user?.role === 'admin';
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'team' | 'templates'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'team'>('profile');
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [autoDistribute, setAutoDistribute] = useState(false);
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ title: '', content: '' });
   const [profileForm, setProfileForm] = useState({ name: '', phone: '', email: '' });
+  const [passwordForm, setPasswordForm] = useState({ password: '', confirmPassword: '' });
   const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchSettings();
-    fetchProfiles();
-    fetchTemplates();
-  }, []);
+    if (isAdmin) {
+      fetchProfiles();
+    }
+  }, [isAdmin]);
 
   useEffect(() => {
     setProfileForm({
@@ -52,7 +46,7 @@ const AdminConfig: React.FC = () => {
 
   const fetchSettings = async () => {
     const { data } = await supabase.from('settings').select('*').single();
-    if (data) setAutoDistribute(data.auto_distribution);
+    if (data) setAutoDistribute(Boolean(data.auto_distribution));
   };
 
   const fetchProfiles = async () => {
@@ -60,43 +54,20 @@ const AdminConfig: React.FC = () => {
     if (data) setProfiles(data as Profile[]);
   };
 
-  const fetchTemplates = async () => {
-    const { data } = await supabase.from('message_templates').select('*').order('created_at', { ascending: true });
-    if (data) setTemplates(data as Template[]);
-    setLoading(false);
-  };
-
   const toggleAutoDistribution = async () => {
-    const newValue = !autoDistribute;
-    setAutoDistribute(newValue);
-    await supabase.from('settings').update({ auto_distribution: newValue }).eq('id', 1);
+    const nextValue = !autoDistribute;
+    setAutoDistribute(nextValue);
+    await supabase.from('settings').update({ auto_distribution: nextValue }).eq('id', 1);
   };
 
-  const toggleAgentStatus = async (id: string, currentStatus: boolean) => {
-    setProfiles(prev => prev.map(p => (p.id === id ? { ...p, active: !currentStatus } : p)));
-    await supabase.from('profiles').update({ active: !currentStatus }).eq('id', id);
+  const updateProfileStatus = async (id: string, active: boolean) => {
+    await supabase.from('profiles').update({ active }).eq('id', id);
+    await fetchProfiles();
   };
 
-  const handleSaveTemplate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.title || !formData.content) return;
-
-    if (editingId) {
-      await supabase.from('message_templates').update(formData).eq('id', editingId);
-    } else {
-      await supabase.from('message_templates').insert([formData]);
-    }
-
-    setFormData({ title: '', content: '' });
-    setEditingId(null);
-    fetchTemplates();
-  };
-
-  const handleDeleteTemplate = async (id: string) => {
-    if (confirm('Excluir?')) {
-      await supabase.from('message_templates').delete().eq('id', id);
-      fetchTemplates();
-    }
+  const deleteProfile = async (id: string) => {
+    await supabase.from('profiles').delete().eq('id', id);
+    await fetchProfiles();
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -111,7 +82,7 @@ const AdminConfig: React.FC = () => {
 
     if (!error) {
       await refreshUser();
-      await fetchProfiles();
+      if (isAdmin) await fetchProfiles();
     }
 
     setSavingProfile(false);
@@ -141,12 +112,22 @@ const AdminConfig: React.FC = () => {
 
       if (!updateError) {
         await refreshUser();
-        await fetchProfiles();
+        if (isAdmin) await fetchProfiles();
       }
     }
 
     setUploadingAvatar(false);
     event.target.value = '';
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordForm.password || passwordForm.password !== passwordForm.confirmPassword) return;
+
+    setSavingPassword(true);
+    await supabase.auth.updateUser({ password: passwordForm.password });
+    setPasswordForm({ password: '', confirmPassword: '' });
+    setSavingPassword(false);
   };
 
   const currentLevel = Math.max(1, Number(user?.level ?? 1));
@@ -161,11 +142,14 @@ const AdminConfig: React.FC = () => {
     return `${user.role.charAt(0).toUpperCase()}${user.role.slice(1)}`;
   }, [user?.role]);
 
+  const pendingProfiles = useMemo(() => profiles.filter((profile) => !profile.active), [profiles]);
+  const activeProfiles = useMemo(() => profiles.filter((profile) => profile.active), [profiles]);
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-serif font-bold text-slate-800 dark:text-white">Configurações</h1>
-        <p className="text-sm text-gray-500 dark:text-slate-400">Gerencie seu perfil, equipe e automações do sistema.</p>
+        <p className="text-sm text-gray-500 dark:text-slate-400">Gerencie seu perfil, segurança e equipe.</p>
       </div>
 
       <div className="flex gap-6 border-b border-gray-200 dark:border-slate-700 overflow-x-auto">
@@ -173,34 +157,33 @@ const AdminConfig: React.FC = () => {
           onClick={() => setActiveTab('profile')}
           className={`pb-4 px-2 text-sm font-bold transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === 'profile' ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
         >
-          <Icons.User size={18} /> Meu Perfil
+          <Icons.User size={18} /> Perfil
         </button>
+
         <button
-          onClick={() => setActiveTab('team')}
-          className={`pb-4 px-2 text-sm font-bold transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === 'team' ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+          onClick={() => setActiveTab('security')}
+          className={`pb-4 px-2 text-sm font-bold transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === 'security' ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
         >
-          <Icons.Users size={18} /> Equipe & Distribuição
+          <Icons.Lock size={18} /> Segurança
         </button>
-        <button
-          onClick={() => setActiveTab('templates')}
-          className={`pb-4 px-2 text-sm font-bold transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === 'templates' ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
-        >
-          <Icons.MessageCircle size={18} /> Templates de Mensagem
-        </button>
+
+        {isAdmin && (
+          <button
+            onClick={() => setActiveTab('team')}
+            className={`pb-4 px-2 text-sm font-bold transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${activeTab === 'team' ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+          >
+            <Icons.Users size={18} /> Equipe
+          </button>
+        )}
       </div>
 
       {activeTab === 'profile' && (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-          <div className="xl:col-span-2 bg-white dark:bg-dark-card p-6 rounded-2xl border border-gray-200 dark:border-dark-border">
-            <h3 className="font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
-              <Icons.User size={18} /> Meu Perfil
-            </h3>
-
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 bg-white dark:bg-dark-card p-6 rounded-2xl border border-gray-200 dark:border-dark-border space-y-6">
+            <div className="flex items-center gap-5">
               <button
-                type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="relative w-20 h-20 rounded-full bg-brand-100 text-brand-700 border border-brand-200 overflow-hidden flex items-center justify-center"
+                className="relative w-20 h-20 rounded-full bg-brand-100 dark:bg-slate-700 text-brand-700 dark:text-white overflow-hidden flex items-center justify-center"
                 title="Clique para alterar avatar"
               >
                 {user?.avatar_url ? (
@@ -279,10 +262,7 @@ const AdminConfig: React.FC = () => {
                 <span>{progressCurrent}/{progressMax}</span>
               </div>
               <div className="w-full h-3 rounded-full bg-slate-700 overflow-hidden">
-                <div
-                  className="h-full bg-brand-500 rounded-full transition-all"
-                  style={{ width: `${(progressCurrent / progressMax) * 100}%` }}
-                />
+                <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${(progressCurrent / progressMax) * 100}%` }} />
               </div>
               <p className="text-xs text-slate-300 mt-2">Faltam {pointsToNext} pontos para o próximo nível.</p>
             </div>
@@ -290,114 +270,107 @@ const AdminConfig: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'team' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1">
-            <div className={`p-6 rounded-2xl border shadow-sm transition-all ${autoDistribute ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800' : 'bg-white border-gray-200 dark:bg-dark-card dark:border-dark-border'}`}>
-              <div className="flex items-center gap-4 mb-4">
-                <div className={`p-3 rounded-full ${autoDistribute ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-500'}`}>
-                  <Icons.RefreshCw size={24} className={autoDistribute ? 'animate-spin-slow' : ''} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-800 dark:text-white">Distribuição Automática</h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{autoDistribute ? 'Ativado (Round Robin)' : 'Desativado (Manual)'}</p>
-                </div>
+      {activeTab === 'security' && (
+        <div className="max-w-2xl bg-white dark:bg-dark-card p-6 rounded-2xl border border-gray-200 dark:border-dark-border">
+          <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+            <Icons.Lock size={18} /> Alterar Senha
+          </h3>
+
+          <form onSubmit={handleUpdatePassword} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nova Senha</label>
+              <input
+                type="password"
+                className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-brand-500"
+                value={passwordForm.password}
+                onChange={(e) => setPasswordForm((prev) => ({ ...prev, password: e.target.value }))}
+                required
+                minLength={6}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Confirmar Nova Senha</label>
+              <input
+                type="password"
+                className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-brand-500"
+                value={passwordForm.confirmPassword}
+                onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                required
+                minLength={6}
+              />
+            </div>
+
+            {passwordForm.confirmPassword && passwordForm.password !== passwordForm.confirmPassword && (
+              <p className="text-xs text-red-500">As senhas não coincidem.</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={savingPassword || passwordForm.password !== passwordForm.confirmPassword}
+              className="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-800 disabled:opacity-60"
+            >
+              {savingPassword ? 'Atualizando...' : 'Atualizar Senha'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {activeTab === 'team' && isAdmin && (
+        <div className="space-y-6">
+          <div className={`p-6 rounded-2xl border shadow-sm transition-all ${autoDistribute ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800' : 'bg-white border-gray-200 dark:bg-dark-card dark:border-dark-border'}`}>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <h3 className="font-bold text-slate-800 dark:text-white">Distribuição Automática de Leads</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{autoDistribute ? 'Ativado (Round Robin)' : 'Desativado (Manual)'}</p>
               </div>
-
-              <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
-                Quando ativado, novos leads serão distribuídos sequencialmente entre os corretores marcados como "Disponível".
-              </p>
-
               <button
                 onClick={toggleAutoDistribution}
-                className={`w-full py-3 rounded-xl font-bold transition-colors ${autoDistribute ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-slate-900 hover:bg-slate-800 text-white'}`}
+                className={`px-5 py-2 rounded-xl font-bold transition-colors ${autoDistribute ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-slate-900 hover:bg-slate-800 text-white'}`}
               >
-                {autoDistribute ? 'Desativar Distribuição' : 'Ativar Distribuição'}
+                {autoDistribute ? 'Desativar' : 'Ativar'}
               </button>
             </div>
           </div>
 
-          <div className="lg:col-span-2 space-y-4">
-            <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-              <Icons.Users size={20} /> Membros da Equipe ({profiles.length})
-            </h3>
-
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-white dark:bg-dark-card rounded-2xl border border-gray-200 dark:border-dark-border overflow-hidden">
-              {profiles.map((profile) => (
-                <div key={profile.id} className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 last:border-0 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-slate-700 text-brand-700 dark:text-white flex items-center justify-center font-bold overflow-hidden">
-                      {profile.avatar_url ? (
-                        <img src={profile.avatar_url} alt={profile.name || 'Avatar'} className="w-full h-full object-cover" />
-                      ) : (
-                        profile.name?.charAt(0).toUpperCase() || 'U'
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-800 dark:text-white">{profile.name || 'Usuário sem nome'}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{profile.email}</p>
-                    </div>
+              <div className="p-4 border-b border-gray-100 dark:border-slate-800">
+                <h3 className="font-bold text-slate-800 dark:text-white">Pendentes ({pendingProfiles.length})</h3>
+              </div>
+              {pendingProfiles.map((profile) => (
+                <div key={profile.id} className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 last:border-0">
+                  <div>
+                    <p className="font-bold text-slate-800 dark:text-white">{profile.name || 'Sem nome'}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{profile.email}</p>
                   </div>
-
-                  <div className="flex items-center gap-4">
-                    <span className={`text-xs px-2 py-1 rounded font-bold uppercase ${profile.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                      {profile.active ? 'Disponível' : 'Pausado'}
-                    </span>
-                    <button
-                      onClick={() => toggleAgentStatus(profile.id, profile.active)}
-                      className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-                      title={profile.active ? 'Pausar recebimento de leads' : 'Ativar recebimento'}
-                    >
-                      {profile.active ? <Icons.Pause size={18} /> : <Icons.Play size={18} />}
-                    </button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => updateProfileStatus(profile.id, true)} className="px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-100 text-emerald-700 hover:bg-emerald-200">Aprovar</button>
+                    <button onClick={() => deleteProfile(profile.id)} className="px-3 py-1.5 text-xs font-bold rounded-lg bg-red-100 text-red-700 hover:bg-red-200">Rejeitar</button>
                   </div>
                 </div>
               ))}
-              {profiles.length === 0 && <p className="p-8 text-center text-gray-400">Nenhum membro encontrado.</p>}
+              {pendingProfiles.length === 0 && <p className="p-5 text-sm text-gray-400">Sem usuários pendentes.</p>}
             </div>
 
-            <div className="bg-blue-50 dark:bg-slate-800/50 border border-blue-100 dark:border-slate-700 p-4 rounded-xl flex gap-3">
-              <Icons.Info className="text-blue-500 flex-shrink-0" />
-              <p className="text-xs text-blue-700 dark:text-blue-300">
-                Para adicionar novos corretores, crie uma conta para eles na página de Login. Eles aparecerão aqui automaticamente.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'templates' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white dark:bg-dark-card p-6 rounded-2xl border border-gray-200 dark:border-dark-border h-fit">
-            <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-              <Icons.Edit size={18} className="text-brand-500" /> {editingId ? 'Editar Modelo' : 'Novo Modelo'}
-            </h3>
-            <form onSubmit={handleSaveTemplate} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Título</label>
-                <input type="text" className="w-full px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-brand-500" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required placeholder="Ex: Boas vindas" />
+            <div className="bg-white dark:bg-dark-card rounded-2xl border border-gray-200 dark:border-dark-border overflow-hidden">
+              <div className="p-4 border-b border-gray-100 dark:border-slate-800">
+                <h3 className="font-bold text-slate-800 dark:text-white">Ativos ({activeProfiles.length})</h3>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Conteúdo</label>
-                <textarea className="w-full px-4 py-3 rounded-lg border border-gray-200 dark:border-slate-600 dark:bg-slate-800 dark:text-white outline-none h-32 resize-none focus:ring-2 focus:ring-brand-500" value={formData.content} onChange={e => setFormData({ ...formData, content: e.target.value })} required placeholder="Olá {nome}..." />
-              </div>
-              <div className="flex gap-2 justify-end">
-                {editingId && <button type="button" onClick={() => { setEditingId(null); setFormData({ title: '', content: '' }); }} className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancelar</button>}
-                <button type="submit" className="bg-slate-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-slate-800">Salvar</button>
-              </div>
-            </form>
-          </div>
-          <div className="space-y-3">
-            {!loading && templates.map(tpl => (
-              <div key={tpl.id} className="bg-white dark:bg-dark-card p-4 rounded-xl border border-gray-200 dark:border-dark-border group relative">
-                <h4 className="font-bold text-slate-800 dark:text-white">{tpl.title}</h4>
-                <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mt-1">"{tpl.content}"</p>
-                <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => { setEditingId(tpl.id); setFormData({ title: tpl.title, content: tpl.content }); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded"><Icons.Edit size={16} /></button>
-                  <button onClick={() => handleDeleteTemplate(tpl.id)} className="p-2 text-red-500 hover:bg-red-50 rounded"><Icons.Trash size={16} /></button>
+              {activeProfiles.map((profile) => (
+                <div key={profile.id} className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-slate-800 last:border-0">
+                  <div>
+                    <p className="font-bold text-slate-800 dark:text-white">{profile.name || 'Sem nome'}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{profile.email}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => updateProfileStatus(profile.id, false)} className="px-3 py-1.5 text-xs font-bold rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200">Pausar</button>
+                    <button onClick={() => deleteProfile(profile.id)} className="px-3 py-1.5 text-xs font-bold rounded-lg bg-red-100 text-red-700 hover:bg-red-200">Excluir</button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+              {activeProfiles.length === 0 && <p className="p-5 text-sm text-gray-400">Sem usuários ativos.</p>}
+            </div>
           </div>
         </div>
       )}
